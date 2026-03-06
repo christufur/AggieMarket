@@ -6,6 +6,12 @@ out
 dist
 *.tgz
 
+# db
+db.sqlite
+db.sqlite-journal
+db.sqlite-shm
+db.sqlite-wal
+
 # markdown files
 *.md
 *.mdc

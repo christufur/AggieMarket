@@ -8,7 +8,8 @@ db.run(`
     CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         email TEXT UNIQUE NOT NULL,
-        display_name TEXT NOT NULL,
+        name TEXT NOT NULL,
+        password_hash TEXT NOT NULL,
         bio TEXT,
         avatar_url TEXT,
         status TEXT DEFAULT 'pending_verification', -- (pending_verification | active | suspended)
