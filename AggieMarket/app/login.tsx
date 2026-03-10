@@ -7,18 +7,54 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { colors } from "../theme/colors";
+import { useAuth } from "../context/AuthContext";
+import { API } from "../constants/api";
 
 export default function LoginScreen() {
   const router = useRouter();
+  const { login } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  const handleLogin = () => {
-    router.replace("/home");
+  const handleLogin = async () => {
+    setError("");
+    if (!email || !password) {
+      setError("Please fill in all fields.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await fetch(API.login, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await res.json();
+
+      if (data.token) {
+        // Fetch user profile with the token
+        const meRes = await fetch(API.me, {
+          headers: { Authorization: `Bearer ${data.token}` },
+        });
+        const meData = await meRes.json();
+        await login(data.token, meData.user);
+        // _layout.tsx will redirect to /home
+      } else {
+        setError(data.message || "Login failed.");
+      }
+    } catch (e: any) {
+      setError(`Network error: ${e?.message ?? "unknown"}`);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -47,6 +83,7 @@ export default function LoginScreen() {
               autoCapitalize="none"
               keyboardType="email-address"
               autoComplete="email"
+              editable={!loading}
             />
             <Text style={styles.label}>Password</Text>
             <TextInput
@@ -57,9 +94,21 @@ export default function LoginScreen() {
               placeholderTextColor={colors.mid}
               secureTextEntry
               autoComplete="password"
+              editable={!loading}
             />
-            <Pressable style={styles.primaryBtn} onPress={handleLogin}>
-              <Text style={styles.primaryBtnText}>Log in</Text>
+
+            {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
+            <Pressable
+              style={[styles.primaryBtn, loading && styles.primaryBtnDisabled]}
+              onPress={handleLogin}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator color={colors.white} />
+              ) : (
+                <Text style={styles.primaryBtnText}>Log in</Text>
+              )}
             </Pressable>
           </View>
 
@@ -76,21 +125,10 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: colors.white,
-  },
-  keyboard: {
-    flex: 1,
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: 24,
-    paddingTop: 24,
-  },
-  header: {
-    marginBottom: 32,
-  },
+  safe: { flex: 1, backgroundColor: colors.white },
+  keyboard: { flex: 1 },
+  content: { flex: 1, paddingHorizontal: 24, paddingTop: 24 },
+  header: { marginBottom: 32 },
   badge: {
     alignSelf: "flex-start",
     backgroundColor: colors.ink,
@@ -99,29 +137,11 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     marginBottom: 16,
   },
-  badgeText: {
-    color: colors.white,
-    fontSize: 12,
-    fontWeight: "700",
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: colors.ink,
-    marginBottom: 4,
-  },
-  sub: {
-    fontSize: 14,
-    color: colors.dark,
-  },
-  form: {
-    gap: 16,
-  },
-  label: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: colors.ink,
-  },
+  badgeText: { color: colors.white, fontSize: 12, fontWeight: "700" },
+  title: { fontSize: 24, fontWeight: "700", color: colors.ink, marginBottom: 4 },
+  sub: { fontSize: 14, color: colors.dark },
+  form: { gap: 16 },
+  label: { fontSize: 12, fontWeight: "700", color: colors.ink },
   input: {
     borderWidth: 1.5,
     borderColor: colors.mid,
@@ -131,6 +151,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.ink,
   },
+  errorText: {
+    fontSize: 13,
+    color: "#D32F2F",
+    fontWeight: "500",
+  },
   primaryBtn: {
     backgroundColor: colors.ink,
     paddingVertical: 14,
@@ -138,24 +163,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: 8,
   },
-  primaryBtnText: {
-    color: colors.white,
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  switchLink: {
-    marginTop: 24,
-  },
-  switchLinkText: {
-    fontSize: 14,
-    color: colors.ink,
-    fontWeight: "600",
-  },
-  backLink: {
-    marginTop: 12,
-  },
-  backLinkText: {
-    fontSize: 14,
-    color: colors.dark,
-  },
+  primaryBtnDisabled: { opacity: 0.5 },
+  primaryBtnText: { color: colors.white, fontSize: 16, fontWeight: "700" },
+  switchLink: { marginTop: 24 },
+  switchLinkText: { fontSize: 14, color: colors.ink, fontWeight: "600" },
+  backLink: { marginTop: 12 },
+  backLinkText: { fontSize: 14, color: colors.dark },
 });
