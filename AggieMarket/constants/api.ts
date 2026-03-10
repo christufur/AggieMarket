@@ -1,7 +1,10 @@
 import { Platform } from "react-native";
 
-// iOS simulator → localhost, Android emulator → 10.0.2.2
-const BASE = Platform.OS === "android" ? "http://10.0.2.2:3000" : "http://localhost:3000";
+const BASE = Platform.OS === "web" 
+  ? "https://aggiemarket.xyz"
+  : Platform.OS === "android" 
+  ? "http://10.0.2.2:3000" 
+  : "http://localhost:3000";
 
 export const API = {
   register: `${BASE}/auth/register`,
