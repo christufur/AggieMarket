@@ -2,6 +2,7 @@ import { View, Text, ScrollView, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { TopNav, SectionHeader, CardH } from "../components";
 import { colors } from "../theme/colors";
+import { useAuth } from "../context/AuthContext";
 
 const popularListings = [
   { title: "Calc Textbook", price: "$25", id: "1" },
@@ -23,6 +24,9 @@ const events = [
 ];
 
 export default function HomeScreen() {
+  const { user } = useAuth();
+  const firstName = user?.name?.split(" ")[0] ?? "there";
+
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
       <TopNav />
@@ -32,7 +36,7 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.hero}>
-          <Text style={styles.heroTitle}>Welcome back, Alex 👋</Text>
+          <Text style={styles.heroTitle}>Welcome back, {firstName}</Text>
           <Text style={styles.heroSub}>
             Discover verified listings from NMSU students
           </Text>

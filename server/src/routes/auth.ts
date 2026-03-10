@@ -47,7 +47,8 @@ const authRoutes = new Elysia()
         );
 
         //6. send verification email
-        await sendVerificationEmail(email, token);
+        console.log(`[DEV] Verification token for ${email}: ${token}`);
+        sendVerificationEmail(email, token).catch(() => {});
 
         return { message: "Account created. Check your NMSU email for a verification code.", status: 201 }
     })
