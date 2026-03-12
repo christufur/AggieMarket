@@ -1,16 +1,16 @@
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { colors } from "../theme/colors";
 
-export function TopNav() {
+export function TopNav({onHomePress, onAdd}: {onHomePress?: () => void, onAdd?: () => void}) {
   return (
     <View style={styles.container}>
-      <View style={styles.logoRow}>
+      <TouchableOpacity style={styles.logoRow} onPress={onHomePress} activeOpacity={0.7}>
         <View style={styles.badge}>
           <Text style={styles.badgeText}>AM</Text>
         </View>
         <Text style={styles.logo}>Aggie Market</Text>
-      </View>
+      </TouchableOpacity>
       <View style={styles.actions}>
         <View style={styles.iconBtn}>
           <Ionicons name="search" size={16} color={colors.dark} />
@@ -18,6 +18,12 @@ export function TopNav() {
         <View style={styles.iconBtn}>
           <Ionicons name="mail-outline" size={16} color={colors.dark} />
         </View>
+        <TouchableOpacity style={styles.iconBtn}>
+          <Ionicons name="person-outline" size={16} color={colors.dark} />
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.iconBtn} onPress={onAdd}>
+          <Ionicons name="add" size={16} color={colors.dark} />
+        </TouchableOpacity>
       </View>
     </View>
   );
