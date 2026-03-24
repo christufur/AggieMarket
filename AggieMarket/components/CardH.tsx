@@ -1,4 +1,4 @@
-import { View, Text, Pressable, StyleSheet } from "react-native";
+import { View, Text, Pressable, StyleSheet, Image } from "react-native";
 import { useRouter } from "expo-router";
 import { colors } from "../theme/colors";
 
@@ -6,17 +6,31 @@ type CardHProps = {
   title: string;
   price?: string;
   sub?: string;
+  imageUrl?: string | null;
   listingId?: string;
+  serviceId?: string;
+  eventId?: string;
 };
 
-export function CardH({ title, price, sub, listingId }: CardHProps) {
+export function CardH({ title, price, sub, imageUrl, listingId, serviceId, eventId }: CardHProps) {
   const router = useRouter();
+
+  function handlePress() {
+    if (listingId) router.push(`/listing/${listingId}`);
+    else if (serviceId) router.push(`/service/${serviceId}`);
+    else if (eventId) router.push(`/event/${eventId}`);
+  }
+
   return (
     <Pressable
       style={styles.card}
-      onPress={() => listingId && router.push(`/listing/${listingId}`)}
+      onPress={handlePress}
     >
-      <View style={styles.img} />
+      {imageUrl ? (
+        <Image source={{ uri: imageUrl }} style={styles.img} />
+      ) : (
+        <View style={styles.img} />
+      )}
       <View style={styles.body}>
         <Text style={styles.title} numberOfLines={1}>
           {title}

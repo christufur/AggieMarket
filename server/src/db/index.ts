@@ -50,7 +50,7 @@ db.run(`
 // Content Tables
 db.run(`
   CREATE TABLE IF NOT EXISTS listings (
-    id TEXT PRIMARY KEY DEFAULT (uuid()), -- Bun's built-in UUID support
+    id TEXT PRIMARY KEY,
     seller_id TEXT NOT NULL,
     title TEXT NOT NULL,
     description TEXT NOT NULL,
@@ -78,7 +78,7 @@ db.run(`
 
 db.run(`
   CREATE TABLE IF NOT EXISTS services (
-    id TEXT PRIMARY KEY DEFAULT (uuid()),
+    id TEXT PRIMARY KEY,
     provider_id TEXT NOT NULL,
     title TEXT NOT NULL,
     description TEXT NOT NULL,
@@ -106,7 +106,7 @@ db.run(`
 
 db.run(`
   CREATE TABLE IF NOT EXISTS events (
-    id TEXT PRIMARY KEY DEFAULT (uuid()),
+    id TEXT PRIMARY KEY,
     organizer_id TEXT NOT NULL,
     title TEXT NOT NULL,
     description TEXT NOT NULL,
