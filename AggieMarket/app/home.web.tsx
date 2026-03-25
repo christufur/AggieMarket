@@ -255,6 +255,8 @@ function CreatePostModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [images, setImages] = useState<ImagePicker.ImagePickerAsset[]>([]);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   function set<K extends keyof PostForm>(key: K, value: PostForm[K]) {
     setForm((p) => ({ ...p, [key]: value }));
@@ -525,39 +527,43 @@ function CreatePostModal({
                 <TextInput style={m.input} placeholder="e.g. Corbett Center, Room 203" placeholderTextColor={colors.mid} value={form.location} onChangeText={(v) => set("location", v)} editable={!saving} />
 
                 <Text style={m.label}>Start Date & Time *</Text>
-                <DatePicker
-                  selected={form.startsAt}
-                  onChange={(date: Date | null) => set("startsAt", date)}
-                  selectsStart
-                  startDate={form.startsAt}
-                  endDate={form.endsAt}
-                  showTimeSelect
-                  timeIntervals={15}
-                  dateFormat="MMM d, yyyy h:mm aa"
-                  placeholderText="Select start date & time"
-                  disabled={saving}
-                  className="am-datepicker"
-                  withPortal
-                  portalId="datepicker-portal"
-                />
+                {mounted && (
+                  <DatePicker
+                    selected={form.startsAt}
+                    onChange={(date: Date | null) => set("startsAt", date)}
+                    selectsStart
+                    startDate={form.startsAt}
+                    endDate={form.endsAt}
+                    showTimeSelect
+                    timeIntervals={15}
+                    dateFormat="MMM d, yyyy h:mm aa"
+                    placeholderText="Select start date & time"
+                    disabled={saving}
+                    className="am-datepicker"
+                    withPortal
+                    portalId="datepicker-portal"
+                  />
+                )}
 
                 <Text style={m.label}>End Date & Time</Text>
-                <DatePicker
-                  selected={form.endsAt}
-                  onChange={(date: Date | null) => set("endsAt", date)}
-                  selectsEnd
-                  startDate={form.startsAt}
-                  endDate={form.endsAt}
-                  minDate={form.startsAt ?? undefined}
-                  showTimeSelect
-                  timeIntervals={15}
-                  dateFormat="MMM d, yyyy h:mm aa"
-                  placeholderText="Select end date & time (optional)"
-                  disabled={saving}
-                  className="am-datepicker"
-                  withPortal
-                  portalId="datepicker-portal"
-                />
+                {mounted && (
+                  <DatePicker
+                    selected={form.endsAt}
+                    onChange={(date: Date | null) => set("endsAt", date)}
+                    selectsEnd
+                    startDate={form.startsAt}
+                    endDate={form.endsAt}
+                    minDate={form.startsAt ?? undefined}
+                    showTimeSelect
+                    timeIntervals={15}
+                    dateFormat="MMM d, yyyy h:mm aa"
+                    placeholderText="Select end date & time (optional)"
+                    disabled={saving}
+                    className="am-datepicker"
+                    withPortal
+                    portalId="datepicker-portal"
+                  />
+                )}
                 <View style={m.freeRow}>
                   <Text style={m.label}>Free event</Text>
                   <Switch value={form.eventFree} onValueChange={(v) => set("eventFree", v)} disabled={saving} />
