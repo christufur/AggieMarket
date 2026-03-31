@@ -3,12 +3,6 @@
 # dependencies
 node_modules/
 
-# wireframes
-wireframes.html
-
-# markdown files
-*.md
-
 # Expo
 .expo/
 dist/
@@ -47,3 +41,11 @@ app-example
 # generated native folders
 /ios
 /android
+
+# build
+build/
+
+# bundle
+bundle/
+
+
