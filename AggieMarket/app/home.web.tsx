@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback, memo } from "react";
 import {
-  View, Text, TextInput, Pressable, ScrollView, StyleSheet,
+  View, Pressable, ScrollView,
   Modal, Switch, ActivityIndicator, Animated, useWindowDimensions, Image,
 } from "react-native";
 import { useRouter } from "expo-router";
@@ -10,6 +10,16 @@ import DatePicker from "react-datepicker";
 import { colors } from "../theme/colors";
 import { useAuth } from "../context/AuthContext";
 import { API } from "../constants/api";
+import { Ionicons } from "@expo/vector-icons";
+import { Text } from "@/components/ui/text";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Separator } from "@/components/ui/separator";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from "@/components/ui/dialog";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -125,8 +135,17 @@ function Toast({ message, visible }: { message: string; visible: boolean }) {
   }, [visible]);
 
   return (
-    <Animated.View style={[s.toast, { opacity, transform: [{ translateY }] }]} pointerEvents="none">
-      <Text style={s.toastText}>✓  {message}</Text>
+    <Animated.View
+      style={{
+        position: "absolute", bottom: 32, alignSelf: "center",
+        backgroundColor: colors.ink, paddingHorizontal: 22, paddingVertical: 12,
+        borderRadius: 100, shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 12,
+        opacity, transform: [{ translateY }],
+      }}
+      pointerEvents="none"
+    >
+      <Text className="text-primary-foreground text-[13px] font-semibold">{"✓  "}{message}</Text>
     </Animated.View>
   );
 }
@@ -136,32 +155,52 @@ function Toast({ message, visible }: { message: string; visible: boolean }) {
 const ListingCard = memo(function ListingCard({ item }: { item: Listing }) {
   const router = useRouter();
   const [hovered, setHovered] = useState(false);
-  const label = item.is_free ? "Free" : item.price != null ? `$${item.price}` : "—";
+  const label = item.is_free ? "Free" : item.price != null ? `$${item.price}` : "\u2014";
 
   return (
     <Pressable
-      style={[card.wrap, hovered && card.wrapHover]}
       onPress={() => router.push(`/listing/${item.id}`)}
       onHoverIn={() => setHovered(true)}
       onHoverOut={() => setHovered(false)}
     >
-      {item.image_url ? (
-        <Image source={{ uri: item.image_url }} style={card.img} resizeMode="cover" />
-      ) : (
-        <View style={card.img}><Text style={card.imgLabel}>No photo</Text></View>
-      )}
-      <View style={card.body}>
-        <Text style={card.title} numberOfLines={2}>{item.title}</Text>
-        <Text style={card.price}>{label}</Text>
-        <View style={card.tags}>
-          {item.condition && (
-            <View style={card.tag}><Text style={card.tagText}>{item.condition}</Text></View>
-          )}
-          <View style={[card.tag, card.catTag]}>
-            <Text style={[card.tagText, card.catTagText]}>{item.category}</Text>
+      <Card
+        className="overflow-hidden"
+        style={{
+          transitionDuration: "200ms",
+          transitionProperty: "box-shadow, border-color",
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: hovered ? 8 : 2 },
+          shadowOpacity: hovered ? 0.15 : 0.06,
+          shadowRadius: hovered ? 20 : 8,
+          borderColor: hovered ? "#8C0B42" : undefined,
+        } as any}
+      >
+        {item.image_url ? (
+          <Image
+            source={{ uri: item.image_url }}
+            style={{ width: "100%" as any, height: 208, borderTopLeftRadius: 12, borderTopRightRadius: 12 }}
+            resizeMode="cover"
+          />
+        ) : (
+          <View className="w-full items-center justify-center border-b border-border" style={{ height: 208, backgroundColor: "#FDF2F6" }}>
+            <Ionicons name="image-outline" size={40} color="#8C0B42" style={{ opacity: 0.3 }} />
           </View>
-        </View>
-      </View>
+        )}
+        <CardContent className="p-4 gap-2">
+          <Text className="text-sm font-bold text-foreground font-display leading-[19px]" numberOfLines={2}>{item.title}</Text>
+          <Text className="text-xl font-extrabold font-display tracking-tight" style={{ color: item.is_free ? "#2e7d32" : "#8C0B42" }}>{label}</Text>
+          <View className="flex-row gap-1.5 mt-1 flex-wrap">
+            {item.condition && (
+              <Badge variant="outline" className="px-2 py-0.5 rounded">
+                <Text className="text-[10px] font-medium">{item.condition}</Text>
+              </Badge>
+            )}
+            <Badge className="px-2 py-0.5 rounded" style={{ backgroundColor: "#FDF2F6", borderColor: "#F9C9DB", borderWidth: 1 }}>
+              <Text className="text-[10px] font-medium" style={{ color: "#5E072D" }}>{item.category}</Text>
+            </Badge>
+          </View>
+        </CardContent>
+      </Card>
     </Pressable>
   );
 });
@@ -174,32 +213,48 @@ const ServiceCard = memo(function ServiceCard({ item }: { item: Service }) {
 
   return (
     <Pressable
-      style={[card.wrap, hovered && card.wrapHover]}
       onPress={() => router.push(`/service/${item.id}`)}
       onHoverIn={() => setHovered(true)}
       onHoverOut={() => setHovered(false)}
     >
-      {item.image_url ? (
-        <Image source={{ uri: item.image_url }} style={card.img} resizeMode="cover" />
-      ) : (
-        <View style={[card.img, card.serviceImg]}>
-          <Text style={card.serviceEmoji}>🛠</Text>
-        </View>
-      )}
-      <View style={card.body}>
-        <Text style={card.title} numberOfLines={2}>{item.title}</Text>
-        <Text style={card.price}>{label}</Text>
-        {item.availability ? (
-          <Text style={card.meta} numberOfLines={1}>⏰ {item.availability}</Text>
-        ) : null}
-        <View style={card.tags}>
-          {cats.map((c) => (
-            <View key={c} style={[card.tag, card.catTag]}>
-              <Text style={[card.tagText, card.catTagText]}>{c}</Text>
-            </View>
-          ))}
-        </View>
-      </View>
+      <Card
+        className="overflow-hidden"
+        style={{
+          transitionDuration: "200ms",
+          transitionProperty: "box-shadow, border-color",
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: hovered ? 8 : 2 },
+          shadowOpacity: hovered ? 0.15 : 0.06,
+          shadowRadius: hovered ? 20 : 8,
+          borderColor: hovered ? "#8C0B42" : undefined,
+        } as any}
+      >
+        {item.image_url ? (
+          <Image
+            source={{ uri: item.image_url }}
+            style={{ width: "100%" as any, height: 208, borderTopLeftRadius: 12, borderTopRightRadius: 12 }}
+            resizeMode="cover"
+          />
+        ) : (
+          <View className="w-full items-center justify-center border-b border-border" style={{ height: 208, backgroundColor: "#FDF2F6" }}>
+            <Ionicons name="construct-outline" size={40} color="#8C0B42" style={{ opacity: 0.3 }} />
+          </View>
+        )}
+        <CardContent className="p-4 gap-2">
+          <Text className="text-sm font-bold text-foreground font-display leading-[19px]" numberOfLines={2}>{item.title}</Text>
+          <Text className="text-xl font-extrabold font-display tracking-tight" style={{ color: "#8C0B42" }}>{label}</Text>
+          {item.availability ? (
+            <Text className="text-xs text-muted-foreground mt-0.5" numberOfLines={1}>{"\u23f0 "}{item.availability}</Text>
+          ) : null}
+          <View className="flex-row gap-1.5 mt-1 flex-wrap">
+            {cats.map((c) => (
+              <Badge key={c} className="px-2 py-0.5 rounded" style={{ backgroundColor: "#FDF2F6", borderColor: "#F9C9DB", borderWidth: 1 }}>
+                <Text className="text-[10px] font-medium" style={{ color: "#5E072D" }}>{c}</Text>
+              </Badge>
+            ))}
+          </View>
+        </CardContent>
+      </Card>
     </Pressable>
   );
 });
@@ -212,33 +267,52 @@ const EventCard = memo(function EventCard({ item }: { item: Event }) {
 
   return (
     <Pressable
-      style={[card.wrap, hovered && card.wrapHover]}
       onPress={() => router.push(`/event/${item.id}`)}
       onHoverIn={() => setHovered(true)}
       onHoverOut={() => setHovered(false)}
     >
-      {item.image_url ? (
-        <Image source={{ uri: item.image_url }} style={card.img} resizeMode="cover" />
-      ) : (
-        <View style={[card.img, card.eventImg]}>
-          <Text style={card.serviceEmoji}>📅</Text>
-        </View>
-      )}
-      <View style={card.body}>
-        <Text style={card.title} numberOfLines={2}>{item.title}</Text>
-        <Text style={card.meta}>📍 {item.location}</Text>
-        <Text style={card.meta}>🗓 {formatDate(item.starts_at)}</Text>
-        <View style={card.tags}>
-          <View style={[card.tag, item.is_free ? card.freeTag : card.paidTag]}>
-            <Text style={[card.tagText, item.is_free ? card.freeTagText : card.paidTagText]}>{ticketLabel}</Text>
+      <Card
+        className="overflow-hidden"
+        style={{
+          transitionDuration: "200ms",
+          transitionProperty: "box-shadow, border-color",
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: hovered ? 8 : 2 },
+          shadowOpacity: hovered ? 0.15 : 0.06,
+          shadowRadius: hovered ? 20 : 8,
+          borderColor: hovered ? "#8C0B42" : undefined,
+        } as any}
+      >
+        {item.image_url ? (
+          <Image
+            source={{ uri: item.image_url }}
+            style={{ width: "100%" as any, height: 208, borderTopLeftRadius: 12, borderTopRightRadius: 12 }}
+            resizeMode="cover"
+          />
+        ) : (
+          <View className="w-full items-center justify-center border-b border-border" style={{ height: 208, backgroundColor: "#FDF2F6" }}>
+            <Ionicons name="calendar-outline" size={40} color="#8C0B42" style={{ opacity: 0.3 }} />
           </View>
-          {cats.map((c) => (
-            <View key={c} style={[card.tag, card.catTag]}>
-              <Text style={[card.tagText, card.catTagText]}>{c}</Text>
-            </View>
-          ))}
-        </View>
-      </View>
+        )}
+        <CardContent className="p-4 gap-2">
+          <Text className="text-sm font-bold text-foreground font-display leading-[19px]" numberOfLines={2}>{item.title}</Text>
+          <Text className="text-xs text-muted-foreground mt-0.5">{"\ud83d\udccd "}{item.location}</Text>
+          <Text className="text-xs text-muted-foreground mt-0.5">{"\ud83d\uddd3 "}{formatDate(item.starts_at)}</Text>
+          <View className="flex-row gap-1.5 mt-1 flex-wrap">
+            <Badge
+              variant={item.is_free ? "success" : "outline"}
+              style={!item.is_free ? { backgroundColor: "#fff8e1", borderColor: "#fff8e1" } : undefined}
+            >
+              <Text className={`text-[10px] font-medium ${item.is_free ? "text-green-800" : "text-yellow-800"}`}>{ticketLabel}</Text>
+            </Badge>
+            {cats.map((c) => (
+              <Badge key={c} className="px-2 py-0.5 rounded" style={{ backgroundColor: "#FDF2F6", borderColor: "#F9C9DB", borderWidth: 1 }}>
+                <Text className="text-[10px] font-medium" style={{ color: "#5E072D" }}>{c}</Text>
+              </Badge>
+            ))}
+          </View>
+        </CardContent>
+      </Card>
     </Pressable>
   );
 });
@@ -393,202 +467,259 @@ function CreatePostModal({
   ];
 
   return (
-    <Modal visible={visible} transparent animationType="fade">
-      <Pressable style={m.backdrop} onPress={onClose}>
-        <Pressable style={m.sheet} onPress={() => {}}>
-          <View style={m.header}>
-            <Text style={m.heading}>New Post</Text>
-            <Pressable onPress={onClose} disabled={saving}>
-              <Text style={m.closeBtn}>✕</Text>
-            </Pressable>
-          </View>
+    <Dialog open={visible} onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent className="w-[480px] max-w-[480px] p-0">
+        <DialogHeader className="flex-row justify-between items-center px-6 py-4 border-b border-border mb-0">
+          <DialogTitle>
+            <Text className="text-base font-bold text-foreground">New Post</Text>
+          </DialogTitle>
+          <Pressable onPress={onClose} disabled={saving}>
+            <Text className="text-base text-muted-foreground font-light">{"\u2715"}</Text>
+          </Pressable>
+        </DialogHeader>
 
-          <View style={m.segmentRow}>
-            {typeLabels.map(({ key, label }) => (
+        <View className="flex-row px-6 py-3 gap-2 border-b border-border">
+          {typeLabels.map(({ key, label }) => (
+            <Button
+              key={key}
+              variant={postType === key ? "default" : "outline"}
+              size="sm"
+              className="flex-1"
+              onPress={() => switchType(key)}
+              disabled={saving}
+            >
+              <Text className={postType === key ? "text-[13px] font-semibold text-primary-foreground" : "text-[13px] font-semibold text-muted-foreground"}>{label}</Text>
+            </Button>
+          ))}
+        </View>
+
+        <ScrollView className="px-6 pt-1 pb-6" showsVerticalScrollIndicator={false}>
+          <Text className="text-[11px] font-bold tracking-wide text-muted-foreground uppercase mt-4 mb-1.5">Photos</Text>
+          <View className="flex-row flex-wrap gap-2">
+            {images.map((img, i) => (
               <Pressable
-                key={key}
-                style={[m.segment, postType === key && m.segmentActive]}
-                onPress={() => switchType(key)}
+                key={i}
+                className="w-[72px] h-[72px] rounded-lg overflow-hidden relative"
+                onPress={() => setImages((prev) => prev.filter((_, idx) => idx !== i))}
                 disabled={saving}
               >
-                <Text style={[m.segmentText, postType === key && m.segmentTextActive]}>{label}</Text>
+                <Image source={{ uri: img.uri }} style={{ width: 72, height: 72 }} />
+                <View className="absolute top-0 right-0 w-5 h-5 bg-black/55 rounded-bl-md items-center justify-center">
+                  <Text className="text-primary-foreground text-[11px] font-bold">{"\u2715"}</Text>
+                </View>
+              </Pressable>
+            ))}
+            {images.length < 8 && (
+              <Pressable
+                className="w-[72px] h-[72px] rounded-lg border-[1.5px] border-dashed border-muted-foreground bg-background items-center justify-center gap-1"
+                onPress={pickImages}
+                disabled={saving}
+              >
+                <Text className="text-xl text-muted-foreground leading-[22px]">+</Text>
+                <Text className="text-[9px] text-muted-foreground tracking-wide">Add photo</Text>
+              </Pressable>
+            )}
+          </View>
+
+          <Text className="text-[11px] font-bold tracking-wide text-muted-foreground uppercase mt-4 mb-1.5">Title *</Text>
+          <Input
+            placeholder={postType === "listing" ? "e.g. Calc Textbook" : postType === "service" ? "e.g. Math Tutoring" : "e.g. Spring Career Fair"}
+            value={form.title}
+            onChangeText={(v) => set("title", v)}
+            editable={!saving}
+            className="text-sm"
+            style={{ outlineStyle: "none" } as any}
+          />
+
+          <Text className="text-[11px] font-bold tracking-wide text-muted-foreground uppercase mt-4 mb-1.5">Description</Text>
+          <Input
+            placeholder={postType === "event" ? "What's this event about?" : "Describe it\u2026"}
+            value={form.description}
+            onChangeText={(v) => set("description", v)}
+            multiline
+            editable={!saving}
+            className="text-sm"
+            style={{ minHeight: 80, textAlignVertical: "top", outlineStyle: "none" } as any}
+          />
+
+          <Text className="text-[11px] font-bold tracking-wide text-muted-foreground uppercase mt-4 mb-1.5">Category</Text>
+          <View className="flex-row flex-wrap gap-2">
+            {categories.map((c) => (
+              <Pressable
+                key={c}
+                className={`px-3 py-1.5 rounded-full border-[1.5px] ${form.categories.includes(c) ? "bg-primary border-primary" : "border-border"}`}
+                onPress={() => {
+                  const next = form.categories.includes(c)
+                    ? form.categories.filter((x) => x !== c)
+                    : [...form.categories, c];
+                  set("categories", next);
+                }}
+              >
+                <Text className={`text-xs ${form.categories.includes(c) ? "text-primary-foreground font-semibold" : "text-foreground"}`}>{c}</Text>
               </Pressable>
             ))}
           </View>
 
-          <ScrollView style={m.body} showsVerticalScrollIndicator={false}>
-            <Text style={m.label}>Photos</Text>
-            <View style={m.photoRow}>
-              {images.map((img, i) => (
-                <Pressable
-                  key={i}
-                  style={m.thumb}
-                  onPress={() => setImages((prev) => prev.filter((_, idx) => idx !== i))}
-                  disabled={saving}
-                >
-                  <Image source={{ uri: img.uri }} style={m.thumbImg} />
-                  <View style={m.thumbOverlay}>
-                    <Text style={m.thumbX}>✕</Text>
-                  </View>
-                </Pressable>
-              ))}
-              {images.length < 8 && (
-                <Pressable style={m.addPhoto} onPress={pickImages} disabled={saving}>
-                  <Text style={m.addPhotoIcon}>+</Text>
-                  <Text style={m.addPhotoLabel}>Add photo</Text>
-                </Pressable>
+          {postType === "listing" && (
+            <>
+              <Text className="text-[11px] font-bold tracking-wide text-muted-foreground uppercase mt-4 mb-1.5">Condition</Text>
+              <View className="flex-row flex-wrap gap-2">
+                {CONDITIONS.map((c) => (
+                  <Pressable
+                    key={c}
+                    className={`px-3 py-1.5 rounded-full border-[1.5px] ${form.condition === c ? "bg-primary border-primary" : "border-border"}`}
+                    onPress={() => set("condition", c)}
+                  >
+                    <Text className={`text-xs ${form.condition === c ? "text-primary-foreground font-semibold" : "text-foreground"}`}>{c}</Text>
+                  </Pressable>
+                ))}
+              </View>
+              <View className="flex-row justify-between items-center mt-4">
+                <Text className="text-[11px] font-bold tracking-wide text-muted-foreground uppercase">Free item</Text>
+                <Switch value={form.isFree} onValueChange={(v) => set("isFree", v)} disabled={saving} />
+              </View>
+              {!form.isFree && (
+                <>
+                  <Text className="text-[11px] font-bold tracking-wide text-muted-foreground uppercase mt-4 mb-1.5">Price *</Text>
+                  <Input
+                    placeholder="25.00"
+                    value={form.price}
+                    onChangeText={(v) => set("price", numericOnly(v))}
+                    keyboardType="decimal-pad"
+                    editable={!saving}
+                    className="text-sm"
+                    style={{ outlineStyle: "none" } as any}
+                  />
+                </>
               )}
-            </View>
+            </>
+          )}
 
-            <Text style={m.label}>Title *</Text>
-            <TextInput
-              style={m.input}
-              placeholder={postType === "listing" ? "e.g. Calc Textbook" : postType === "service" ? "e.g. Math Tutoring" : "e.g. Spring Career Fair"}
-              placeholderTextColor={colors.mid}
-              value={form.title}
-              onChangeText={(v) => set("title", v)}
-              editable={!saving}
-            />
+          {postType === "service" && (
+            <>
+              <Text className="text-[11px] font-bold tracking-wide text-muted-foreground uppercase mt-4 mb-1.5">Price Type</Text>
+              <View className="flex-row flex-wrap gap-2">
+                {PRICE_TYPES.map((pt) => (
+                  <Pressable
+                    key={pt}
+                    className={`px-3 py-1.5 rounded-full border-[1.5px] ${form.priceType === pt ? "bg-primary border-primary" : "border-border"}`}
+                    onPress={() => set("priceType", pt)}
+                  >
+                    <Text className={`text-xs ${form.priceType === pt ? "text-primary-foreground font-semibold" : "text-foreground"}`}>
+                      {pt === "starting_at" ? "Starting at" : pt.charAt(0).toUpperCase() + pt.slice(1)}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+              <Text className="text-[11px] font-bold tracking-wide text-muted-foreground uppercase mt-4 mb-1.5">Price</Text>
+              <Input
+                placeholder="20.00"
+                value={form.price}
+                onChangeText={(v) => set("price", numericOnly(v))}
+                keyboardType="decimal-pad"
+                editable={!saving}
+                className="text-sm"
+                style={{ outlineStyle: "none" } as any}
+              />
+              <Text className="text-[11px] font-bold tracking-wide text-muted-foreground uppercase mt-4 mb-1.5">Availability</Text>
+              <Input
+                placeholder="e.g. Weekends, MTTh 4\u20136pm"
+                value={form.availability}
+                onChangeText={(v) => set("availability", v)}
+                editable={!saving}
+                className="text-sm"
+                style={{ outlineStyle: "none" } as any}
+              />
+            </>
+          )}
 
-            <Text style={m.label}>Description</Text>
-            <TextInput
-              style={[m.input, m.textarea]}
-              placeholder={postType === "event" ? "What's this event about?" : "Describe it…"}
-              placeholderTextColor={colors.mid}
-              value={form.description}
-              onChangeText={(v) => set("description", v)}
-              multiline
-              editable={!saving}
-            />
+          {postType === "event" && (
+            <>
+              <Text className="text-[11px] font-bold tracking-wide text-muted-foreground uppercase mt-4 mb-1.5">Location *</Text>
+              <Input
+                placeholder="e.g. Corbett Center, Room 203"
+                value={form.location}
+                onChangeText={(v) => set("location", v)}
+                editable={!saving}
+                className="text-sm"
+                style={{ outlineStyle: "none" } as any}
+              />
 
-            <Text style={m.label}>Category</Text>
-            <View style={m.pills}>
-              {categories.map((c) => (
-                <Pressable
-                  key={c}
-                  style={[m.pill, form.categories.includes(c) && m.pillOn]}
-                  onPress={() => {
-                    const next = form.categories.includes(c)
-                      ? form.categories.filter((x) => x !== c)
-                      : [...form.categories, c];
-                    set("categories", next);
-                  }}
-                >
-                  <Text style={[m.pillText, form.categories.includes(c) && m.pillTextOn]}>{c}</Text>
-                </Pressable>
-              ))}
-            </View>
+              <Text className="text-[11px] font-bold tracking-wide text-muted-foreground uppercase mt-4 mb-1.5">Start Date & Time *</Text>
+              {mounted && (
+                <DatePicker
+                  selected={form.startsAt}
+                  onChange={(date: Date | null) => set("startsAt", date)}
+                  selectsStart
+                  startDate={form.startsAt}
+                  endDate={form.endsAt}
+                  showTimeSelect
+                  timeIntervals={15}
+                  dateFormat="MMM d, yyyy h:mm aa"
+                  placeholderText="Select start date & time"
+                  disabled={saving}
+                  className="am-datepicker"
+                  withPortal
+                  portalId="datepicker-portal"
+                />
+              )}
 
-            {postType === "listing" && (
-              <>
-                <Text style={m.label}>Condition</Text>
-                <View style={m.pills}>
-                  {CONDITIONS.map((c) => (
-                    <Pressable key={c} style={[m.pill, form.condition === c && m.pillOn]} onPress={() => set("condition", c)}>
-                      <Text style={[m.pillText, form.condition === c && m.pillTextOn]}>{c}</Text>
-                    </Pressable>
-                  ))}
-                </View>
-                <View style={m.freeRow}>
-                  <Text style={m.label}>Free item</Text>
-                  <Switch value={form.isFree} onValueChange={(v) => set("isFree", v)} disabled={saving} />
-                </View>
-                {!form.isFree && (
-                  <>
-                    <Text style={m.label}>Price *</Text>
-                    <TextInput style={m.input} placeholder="25.00" placeholderTextColor={colors.mid} value={form.price} onChangeText={(v) => set("price", numericOnly(v))} keyboardType="decimal-pad" editable={!saving} />
-                  </>
-                )}
-              </>
-            )}
-
-            {postType === "service" && (
-              <>
-                <Text style={m.label}>Price Type</Text>
-                <View style={m.pills}>
-                  {PRICE_TYPES.map((pt) => (
-                    <Pressable key={pt} style={[m.pill, form.priceType === pt && m.pillOn]} onPress={() => set("priceType", pt)}>
-                      <Text style={[m.pillText, form.priceType === pt && m.pillTextOn]}>
-                        {pt === "starting_at" ? "Starting at" : pt.charAt(0).toUpperCase() + pt.slice(1)}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
-                <Text style={m.label}>Price</Text>
-                <TextInput style={m.input} placeholder="20.00" placeholderTextColor={colors.mid} value={form.price} onChangeText={(v) => set("price", numericOnly(v))} keyboardType="decimal-pad" editable={!saving} />
-                <Text style={m.label}>Availability</Text>
-                <TextInput style={m.input} placeholder="e.g. Weekends, MTTh 4–6pm" placeholderTextColor={colors.mid} value={form.availability} onChangeText={(v) => set("availability", v)} editable={!saving} />
-              </>
-            )}
-
-            {postType === "event" && (
-              <>
-                <Text style={m.label}>Location *</Text>
-                <TextInput style={m.input} placeholder="e.g. Corbett Center, Room 203" placeholderTextColor={colors.mid} value={form.location} onChangeText={(v) => set("location", v)} editable={!saving} />
-
-                <Text style={m.label}>Start Date & Time *</Text>
-                {mounted && (
-                  <DatePicker
-                    selected={form.startsAt}
-                    onChange={(date: Date | null) => set("startsAt", date)}
-                    selectsStart
-                    startDate={form.startsAt}
-                    endDate={form.endsAt}
-                    showTimeSelect
-                    timeIntervals={15}
-                    dateFormat="MMM d, yyyy h:mm aa"
-                    placeholderText="Select start date & time"
-                    disabled={saving}
-                    className="am-datepicker"
-                    withPortal
-                    portalId="datepicker-portal"
+              <Text className="text-[11px] font-bold tracking-wide text-muted-foreground uppercase mt-4 mb-1.5">End Date & Time</Text>
+              {mounted && (
+                <DatePicker
+                  selected={form.endsAt}
+                  onChange={(date: Date | null) => set("endsAt", date)}
+                  selectsEnd
+                  startDate={form.startsAt}
+                  endDate={form.endsAt}
+                  minDate={form.startsAt ?? undefined}
+                  showTimeSelect
+                  timeIntervals={15}
+                  dateFormat="MMM d, yyyy h:mm aa"
+                  placeholderText="Select end date & time (optional)"
+                  disabled={saving}
+                  className="am-datepicker"
+                  withPortal
+                  portalId="datepicker-portal"
+                />
+              )}
+              <View className="flex-row justify-between items-center mt-4">
+                <Text className="text-[11px] font-bold tracking-wide text-muted-foreground uppercase">Free event</Text>
+                <Switch value={form.eventFree} onValueChange={(v) => set("eventFree", v)} disabled={saving} />
+              </View>
+              {!form.eventFree && (
+                <>
+                  <Text className="text-[11px] font-bold tracking-wide text-muted-foreground uppercase mt-4 mb-1.5">Ticket Price *</Text>
+                  <Input
+                    placeholder="10.00"
+                    value={form.ticketPrice}
+                    onChangeText={(v) => set("ticketPrice", numericOnly(v))}
+                    keyboardType="decimal-pad"
+                    editable={!saving}
+                    className="text-sm"
+                    style={{ outlineStyle: "none" } as any}
                   />
-                )}
+                </>
+              )}
+            </>
+          )}
 
-                <Text style={m.label}>End Date & Time</Text>
-                {mounted && (
-                  <DatePicker
-                    selected={form.endsAt}
-                    onChange={(date: Date | null) => set("endsAt", date)}
-                    selectsEnd
-                    startDate={form.startsAt}
-                    endDate={form.endsAt}
-                    minDate={form.startsAt ?? undefined}
-                    showTimeSelect
-                    timeIntervals={15}
-                    dateFormat="MMM d, yyyy h:mm aa"
-                    placeholderText="Select end date & time (optional)"
-                    disabled={saving}
-                    className="am-datepicker"
-                    withPortal
-                    portalId="datepicker-portal"
-                  />
-                )}
-                <View style={m.freeRow}>
-                  <Text style={m.label}>Free event</Text>
-                  <Switch value={form.eventFree} onValueChange={(v) => set("eventFree", v)} disabled={saving} />
-                </View>
-                {!form.eventFree && (
-                  <>
-                    <Text style={m.label}>Ticket Price *</Text>
-                    <TextInput style={m.input} placeholder="10.00" placeholderTextColor={colors.mid} value={form.ticketPrice} onChangeText={(v) => set("ticketPrice", numericOnly(v))} keyboardType="decimal-pad" editable={!saving} />
-                  </>
-                )}
-              </>
-            )}
+          {error ? <Text className="text-xs text-destructive mt-3">{error}</Text> : null}
 
-            {error ? <Text style={m.error}>{error}</Text> : null}
-
-            <Pressable style={[m.submitBtn, saving && m.submitBtnDim]} onPress={submit} disabled={saving}>
-              {saving
-                ? <ActivityIndicator color={colors.white} size="small" />
-                : <Text style={m.submitText}>Post {postType.charAt(0).toUpperCase() + postType.slice(1)}</Text>
-              }
-            </Pressable>
-          </ScrollView>
-        </Pressable>
-      </Pressable>
-    </Modal>
+          <Button
+            className="mt-5 rounded-[10px]"
+            onPress={submit}
+            disabled={saving}
+            style={saving ? { opacity: 0.5 } : undefined}
+          >
+            {saving
+              ? <ActivityIndicator color={colors.white} size="small" />
+              : <Text className="text-sm font-bold text-primary-foreground">Post {postType.charAt(0).toUpperCase() + postType.slice(1)}</Text>
+            }
+          </Button>
+        </ScrollView>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -689,17 +820,15 @@ export default function HomeWebScreen() {
     activeTab === "service" ? filteredServices.length :
     filteredEvents.length;
 
-  const cols = width > 1200 ? 3 : width > 800 ? 2 : 1;
-  const SIDEBAR = 220;
-  const GUTTER = 24;
-  const contentWidth = Math.min(width - 48, 1280);
-  const gridWidth = contentWidth - SIDEBAR - GUTTER;
-  const cardWidth = (gridWidth - (cols - 1) * 16) / cols;
+  const isMobile = width < 768;
+  const SIDEBAR = isMobile ? 0 : 220;
+  const contentWidth = Math.min(width - (isMobile ? 16 : 48), 1280);
+  const gridCols = isMobile ? (width < 480 ? 1 : 2) : 3;
 
   const tabPlaceholder =
-    activeTab === "listing" ? "Search listings…" :
-    activeTab === "service" ? "Search services…" :
-    "Search events…";
+    activeTab === "listing" ? "Search listings\u2026" :
+    activeTab === "service" ? "Search services\u2026" :
+    "Search events\u2026";
 
   const emptyPostLabel =
     activeTab === "listing" ? "Post a Listing" :
@@ -712,168 +841,179 @@ export default function HomeWebScreen() {
     "No events found";
 
   return (
-    <View style={s.root}>
+    <View className="flex-1 bg-background">
       {/* ── Navbar ── */}
-      <View style={s.nav}>
-        <View style={[s.navInner, { maxWidth: contentWidth }]}>
-          <Pressable style={s.navLogo} onPress={() => router.push("/home")}>
-            <View style={s.navBadge}><Text style={s.navBadgeText}>AM</Text></View>
-            <Text style={s.navLogoText}>Aggie Market</Text>
+      <View
+        className="bg-card border-b border-border h-[60px] justify-center z-[100]"
+        style={{ position: "sticky" as any, top: 0, paddingHorizontal: isMobile ? 12 : 24 }}
+      >
+        <View className="flex-row items-center self-center w-full gap-3" style={{ maxWidth: contentWidth }}>
+          <Pressable className="flex-row items-center gap-2 shrink-0" onPress={() => router.push("/home")}>
+            <View className="bg-primary px-[7px] py-[3px] rounded">
+              <Text className="text-primary-foreground text-[11px] font-extrabold tracking-wide">AM</Text>
+            </View>
+            {!isMobile && <Text className="text-base font-bold text-foreground tracking-tight font-display">Aggie Market</Text>}
           </Pressable>
 
-          <View style={[s.navSearch, searchFocused && s.navSearchFocused]}>
-            <Text style={s.navSearchIcon}>⌕</Text>
-            <TextInput
-              style={s.navSearchInput}
-              placeholder={tabPlaceholder}
-              placeholderTextColor={colors.mid}
+          <View
+            className={`flex-1 flex-row items-center bg-background border-[1.5px] rounded-lg px-3 h-[38px] gap-2 ${searchFocused ? "border-foreground" : "border-border"}`}
+          >
+            <Ionicons name="search-outline" size={16} color="#757575" />
+            <Input
+              className="flex-1 text-[13px] border-0 h-auto p-0"
+              placeholder={isMobile ? "Search..." : tabPlaceholder}
               value={query}
               onChangeText={setQuery}
               onFocus={() => setSearchFocused(true)}
               onBlur={() => setSearchFocused(false)}
+              style={{ outlineStyle: "none" } as any}
             />
           </View>
 
-          <View style={s.navRight}>
-            <View style={s.navIcon}><Text style={s.navIconText}>✉</Text></View>
-            <View style={s.navIcon}><Text style={s.navIconText}>◉</Text></View>
-            <Pressable style={s.postBtn} onPress={() => setModalVisible(true)}>
-              <Text style={s.postBtnText}>+ New Post</Text>
+          <View className="flex-row items-center gap-2 shrink-0">
+            {!isMobile && (
+              <Pressable className="w-9 h-9 border-[1.5px] border-border rounded-lg items-center justify-center">
+                <Ionicons name="chatbubble-outline" size={16} color="#757575" />
+              </Pressable>
+            )}
+            <Pressable className="w-9 h-9 border-[1.5px] border-border rounded-lg items-center justify-center" onPress={() => router.push("/profile")}>
+              <Ionicons name="person-outline" size={16} color="#757575" />
             </Pressable>
+            <Button size="sm" onPress={() => setModalVisible(true)}>
+              <Text className="text-primary-foreground text-[13px] font-bold">{isMobile ? "+" : "+ New Post"}</Text>
+            </Button>
           </View>
         </View>
       </View>
 
-      <ScrollView style={s.scroll} showsVerticalScrollIndicator={false}>
-        {/* ── Hero ── */}
-        <View style={s.hero}>
-          <View style={[s.heroInner, { maxWidth: contentWidth }]}>
-            <Text style={s.heroEyebrow}>NMSU Verified · Students Only</Text>
-            <Text style={s.heroHeadline}>The NMSU Student{"\n"}Marketplace</Text>
-            <Text style={s.heroSub}>Buy, sell, and discover — verified students only.</Text>
-            <View style={[s.heroSearch, searchFocused && s.heroSearchFocused]}>
-              <Text style={s.heroSearchIcon}>⌕</Text>
-              <TextInput
-                style={s.heroSearchInput}
-                placeholder="What are you looking for?"
-                placeholderTextColor="rgba(255,255,255,0.45)"
-                value={query}
-                onChangeText={setQuery}
-                onFocus={() => setSearchFocused(true)}
-                onBlur={() => setSearchFocused(false)}
-              />
-            </View>
-            <View style={s.heroStats}>
-              <Text style={s.heroStat}>{listings.length} listings</Text>
-              <View style={s.heroDot} />
-              <Text style={s.heroStat}>{services.length} services</Text>
-              <View style={s.heroDot} />
-              <Text style={s.heroStat}>{events.length} events</Text>
-              <View style={s.heroDot} />
-              <Text style={s.heroStat}>NMSU verified</Text>
+      <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
+        {/* ── Banner ── */}
+        <div className="banner-pattern" style={{ background: "linear-gradient(135deg, #8C0B42, #5E072D)" }}>
+          <View className="px-6 py-6">
+            <View className="self-center w-full flex-row items-center justify-between" style={{ maxWidth: contentWidth }}>
+              <View className="flex-1 gap-1">
+                <Text className="text-2xl font-bold text-primary-foreground tracking-tight font-display">
+                  Marketplace
+                </Text>
+                <Text className="text-sm" style={{ color: "rgba(255,255,255,0.6)" }}>
+                  {listings.length} listings · {services.length} services · {events.length} events
+                </Text>
+              </View>
             </View>
           </View>
-        </View>
+        </div>
 
         {/* ── Tab Bar ── */}
-        <View style={[s.tabBar, { paddingHorizontal: Math.max(24, (width - contentWidth) / 2) }]}>
+        <View
+          className="flex-row bg-card border-b border-border items-center gap-1 py-2"
+          style={{ paddingHorizontal: Math.max(24, (width - contentWidth) / 2) }}
+        >
           {TAB_LABELS.map(({ key, label }) => (
             <Pressable
               key={key}
-              style={[s.tab, activeTab === key && s.tabActive]}
+              className={`px-4 py-2 rounded-full ${activeTab === key ? "" : ""}`}
+              style={activeTab === key ? { backgroundColor: "#FDF2F6" } : undefined}
               onPress={() => switchTab(key)}
             >
-              <Text style={[s.tabText, activeTab === key && s.tabTextActive]}>{label}</Text>
-              {activeTab === key && <View style={s.tabUnderline} />}
+              <Text
+                className="text-sm font-semibold"
+                style={{ color: activeTab === key ? "#8C0B42" : "#757575" }}
+              >
+                {label}
+              </Text>
             </Pressable>
           ))}
         </View>
 
         {/* ── Main Content ── */}
-        <View style={[s.main, { maxWidth: contentWidth, alignSelf: "center", width: "100%" }]}>
+        <View className="flex-row pt-8 pb-12 gap-6 self-center w-full" style={{ maxWidth: contentWidth, paddingHorizontal: isMobile ? 12 : 24 }}>
 
           {/* Sidebar */}
-          <View style={[s.sidebar, { width: SIDEBAR }]}>
-            <Text style={s.sidebarHeading}>Categories</Text>
-            <Pressable style={[s.filterItem, !activeCategory && s.filterItemOn]} onPress={() => setActiveCategory(null)}>
-              <Text style={[s.filterText, !activeCategory && s.filterTextOn]}>All</Text>
+          {!isMobile && <View className="shrink-0" style={{ width: SIDEBAR }}>
+            <Text className="text-[10px] font-extrabold tracking-[1.5px] text-muted-foreground uppercase mb-3 mt-1">Categories</Text>
+            <Pressable
+              className="py-2.5 px-3 rounded-md mb-1"
+              style={!activeCategory ? { backgroundColor: "#FDF2F6" } : undefined}
+              onPress={() => setActiveCategory(null)}
+            >
+              <Text className="text-[13px] font-medium" style={{ color: !activeCategory ? "#8C0B42" : "#757575", fontWeight: !activeCategory ? "600" : "500" }}>All</Text>
             </Pressable>
             {currentCategories.map((c) => (
               <Pressable
                 key={c}
-                style={[s.filterItem, activeCategory === c && s.filterItemOn]}
+                className="py-2.5 px-3 rounded-md mb-1"
+                style={activeCategory === c ? { backgroundColor: "#FDF2F6" } : undefined}
                 onPress={() => setActiveCategory(activeCategory === c ? null : c)}
               >
-                <Text style={[s.filterText, activeCategory === c && s.filterTextOn]}>{c}</Text>
+                <Text className="text-[13px] font-medium" style={{ color: activeCategory === c ? "#8C0B42" : "#757575", fontWeight: activeCategory === c ? "600" : "500" }}>{c}</Text>
               </Pressable>
             ))}
 
             {activeTab === "listing" && (
               <>
-                <View style={s.sidebarDivider} />
-                <Text style={s.sidebarHeading}>Condition</Text>
-                <Pressable style={[s.filterItem, !activeCondition && s.filterItemOn]} onPress={() => setActiveCondition(null)}>
-                  <Text style={[s.filterText, !activeCondition && s.filterTextOn]}>Any</Text>
+                <Separator className="my-5" />
+                <Text className="text-[10px] font-extrabold tracking-[1.5px] text-muted-foreground uppercase mb-3 mt-1">Condition</Text>
+                <Pressable
+                  className="py-2.5 px-3 rounded-md mb-1"
+                  style={!activeCondition ? { backgroundColor: "#FDF2F6" } : undefined}
+                  onPress={() => setActiveCondition(null)}
+                >
+                  <Text className="text-[13px] font-medium" style={{ color: !activeCondition ? "#8C0B42" : "#757575", fontWeight: !activeCondition ? "600" : "500" }}>Any</Text>
                 </Pressable>
                 {CONDITIONS.map((c) => (
                   <Pressable
                     key={c}
-                    style={[s.filterItem, activeCondition === c && s.filterItemOn]}
+                    className="py-2.5 px-3 rounded-md mb-1"
+                    style={activeCondition === c ? { backgroundColor: "#FDF2F6" } : undefined}
                     onPress={() => setActiveCondition(activeCondition === c ? null : c)}
                   >
-                    <Text style={[s.filterText, activeCondition === c && s.filterTextOn]}>{c}</Text>
+                    <Text className="text-[13px] font-medium" style={{ color: activeCondition === c ? "#8C0B42" : "#757575", fontWeight: activeCondition === c ? "600" : "500" }}>{c}</Text>
                   </Pressable>
                 ))}
               </>
             )}
-          </View>
+          </View>}
 
           {/* Grid */}
-          <View style={s.gridWrap}>
-            <View style={s.gridHeader}>
-              <Text style={s.gridTitle}>
+          <View className="flex-1 min-w-0">
+            <View className="flex-row justify-between items-baseline mb-5 pb-4 border-b border-border">
+              <Text className="text-xl font-bold text-foreground tracking-tight">
                 {activeCategory ?? (activeTab === "listing" ? "All Listings" : activeTab === "service" ? "All Services" : "All Events")}
-                {activeCondition ? ` · ${activeCondition}` : ""}
+                {activeCondition ? ` \u00b7 ${activeCondition}` : ""}
               </Text>
-              <Text style={s.gridCount}>{currentCount} result{currentCount !== 1 ? "s" : ""}</Text>
+              <Text className="text-[13px] text-muted-foreground">{currentCount} result{currentCount !== 1 ? "s" : ""}</Text>
             </View>
 
             {currentCount === 0 ? (
-              <View style={s.empty}>
-                <Text style={s.emptyIcon}>◎</Text>
-                <Text style={s.emptyTitle}>{emptyNoResultMsg}</Text>
-                <Text style={s.emptySub}>
+              <View className="items-center py-20 gap-3">
+                <Text className="text-[40px] text-border">{"\u25ce"}</Text>
+                <Text className="text-lg font-bold text-foreground">{emptyNoResultMsg}</Text>
+                <Text className="text-sm text-muted-foreground">
                   {query ? `Nothing matches "${query}"` : "Be the first to post one."}
                 </Text>
-                <Pressable style={s.emptyBtn} onPress={() => setModalVisible(true)}>
-                  <Text style={s.emptyBtnText}>{emptyPostLabel}</Text>
-                </Pressable>
+                <Button className="mt-2" onPress={() => setModalVisible(true)}>
+                  <Text className="text-primary-foreground text-[13px] font-bold">{emptyPostLabel}</Text>
+                </Button>
               </View>
             ) : (
-              <View style={[s.grid, { gap: 16 }]}>
+              <div style={{ display: "grid", gridTemplateColumns: `repeat(${gridCols}, 1fr)`, gap: 16 }}>
                 {activeTab === "listing" && filteredListings.map((item) => (
-                  <View key={item.id} style={{ width: cardWidth }}>
-                    <ListingCard item={item} />
-                  </View>
+                  <ListingCard key={item.id} item={item} />
                 ))}
                 {activeTab === "service" && filteredServices.map((item) => (
-                  <View key={item.id} style={{ width: cardWidth }}>
-                    <ServiceCard item={item} />
-                  </View>
+                  <ServiceCard key={item.id} item={item} />
                 ))}
                 {activeTab === "event" && filteredEvents.map((item) => (
-                  <View key={item.id} style={{ width: cardWidth }}>
-                    <EventCard item={item} />
-                  </View>
+                  <EventCard key={item.id} item={item} />
                 ))}
-              </View>
+              </div>
             )}
           </View>
         </View>
 
         {/* ── Footer ── */}
-        <View style={s.footer}>
-          <Text style={s.footerText}>© 2026 Aggie Market · NMSU Verified</Text>
+        <View className="border-t border-border py-6 items-center">
+          <Text className="text-xs text-muted-foreground">{"\u00a9"} 2026 Aggie Market {"\u00b7"} NMSU Verified</Text>
         </View>
       </ScrollView>
 
@@ -888,192 +1028,3 @@ export default function HomeWebScreen() {
     </View>
   );
 }
-
-// ─── Styles ───────────────────────────────────────────────────────────────────
-
-const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.bg },
-  scroll: { flex: 1 },
-
-  nav: {
-    backgroundColor: colors.white,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    paddingHorizontal: 24,
-    height: 60,
-    justifyContent: "center",
-    position: "sticky" as any,
-    top: 0,
-    zIndex: 100,
-  },
-  navInner: { flexDirection: "row", alignItems: "center", alignSelf: "center", width: "100%", gap: 16 },
-  navLogo: { flexDirection: "row", alignItems: "center", gap: 8, flexShrink: 0 },
-  navBadge: { backgroundColor: colors.ink, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 4 },
-  navBadgeText: { color: colors.white, fontSize: 11, fontWeight: "800", letterSpacing: 0.5 },
-  navLogoText: { fontSize: 16, fontWeight: "700", color: colors.ink, letterSpacing: -0.3 },
-  navSearch: {
-    flex: 1, flexDirection: "row", alignItems: "center",
-    backgroundColor: colors.bg, borderWidth: 1.5, borderColor: colors.border,
-    borderRadius: 8, paddingHorizontal: 12, height: 38, gap: 8,
-  },
-  navSearchFocused: { borderColor: colors.ink },
-  navSearchIcon: { fontSize: 16, color: colors.mid },
-  navSearchInput: { flex: 1, fontSize: 13, color: colors.ink, outlineStyle: "none" } as any,
-  navRight: { flexDirection: "row", alignItems: "center", gap: 10, flexShrink: 0 },
-  navIcon: { width: 36, height: 36, borderWidth: 1.5, borderColor: colors.border, borderRadius: 8, alignItems: "center", justifyContent: "center" },
-  navIconText: { fontSize: 15, color: colors.dark },
-  postBtn: { backgroundColor: colors.ink, paddingHorizontal: 16, paddingVertical: 9, borderRadius: 8 },
-  postBtnText: { color: colors.white, fontSize: 13, fontWeight: "700" },
-
-  hero: { backgroundColor: colors.ink, paddingVertical: 64, paddingHorizontal: 24 },
-  heroInner: { alignSelf: "center", width: "100%" },
-  heroEyebrow: { fontSize: 11, fontWeight: "700", letterSpacing: 2, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", marginBottom: 16 },
-  heroHeadline: { fontSize: 52, fontWeight: "800", color: colors.white, letterSpacing: -1.5, lineHeight: 58, marginBottom: 16 },
-  heroSub: { fontSize: 16, color: "rgba(255,255,255,0.65)", marginBottom: 32, lineHeight: 24 },
-  heroSearch: {
-    flexDirection: "row", alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.1)", borderWidth: 1.5,
-    borderColor: "rgba(255,255,255,0.2)", borderRadius: 10,
-    paddingHorizontal: 16, height: 52, gap: 12, maxWidth: 560,
-  },
-  heroSearchFocused: { backgroundColor: "rgba(255,255,255,0.15)", borderColor: "rgba(255,255,255,0.5)" },
-  heroSearchIcon: { fontSize: 20, color: "rgba(255,255,255,0.5)" },
-  heroSearchInput: { flex: 1, fontSize: 15, color: colors.white, outlineStyle: "none" } as any,
-  heroStats: { flexDirection: "row", alignItems: "center", gap: 12, marginTop: 24 },
-  heroStat: { fontSize: 12, color: "rgba(255,255,255,0.45)" },
-  heroDot: { width: 3, height: 3, borderRadius: 2, backgroundColor: "rgba(255,255,255,0.25)" },
-
-  // Tab bar
-  tabBar: {
-    flexDirection: "row",
-    backgroundColor: colors.white,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  tab: {
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    alignItems: "center",
-    position: "relative",
-  },
-  tabActive: {},
-  tabText: { fontSize: 14, fontWeight: "600", color: colors.mid },
-  tabTextActive: { color: colors.ink },
-  tabUnderline: {
-    position: "absolute",
-    bottom: 0,
-    left: 20,
-    right: 20,
-    height: 2,
-    backgroundColor: colors.ink,
-    borderRadius: 1,
-  },
-
-  main: { flexDirection: "row", paddingHorizontal: 24, paddingTop: 32, paddingBottom: 48, gap: 24 },
-
-  sidebar: { flexShrink: 0 },
-  sidebarHeading: { fontSize: 10, fontWeight: "800", letterSpacing: 1.5, color: colors.mid, textTransform: "uppercase", marginBottom: 8, marginTop: 4 },
-  sidebarDivider: { height: 1, backgroundColor: colors.border, marginVertical: 20 },
-  filterItem: { paddingVertical: 8, paddingHorizontal: 12, borderRadius: 6, marginBottom: 2 },
-  filterItemOn: { backgroundColor: colors.ink },
-  filterText: { fontSize: 13, color: colors.dark, fontWeight: "500" },
-  filterTextOn: { color: colors.white, fontWeight: "600" },
-
-  gridWrap: { flex: 1, minWidth: 0 },
-  gridHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "baseline", marginBottom: 20, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: colors.border },
-  gridTitle: { fontSize: 20, fontWeight: "700", color: colors.ink, letterSpacing: -0.3 },
-  gridCount: { fontSize: 13, color: colors.mid },
-  grid: { flexDirection: "row", flexWrap: "wrap" },
-
-  empty: { alignItems: "center", paddingVertical: 80, gap: 12 },
-  emptyIcon: { fontSize: 40, color: colors.border },
-  emptyTitle: { fontSize: 18, fontWeight: "700", color: colors.ink },
-  emptySub: { fontSize: 14, color: colors.mid },
-  emptyBtn: { marginTop: 8, backgroundColor: colors.ink, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 8 },
-  emptyBtnText: { color: colors.white, fontSize: 13, fontWeight: "700" },
-
-  footer: { borderTopWidth: 1, borderTopColor: colors.border, paddingVertical: 24, alignItems: "center" },
-  footerText: { fontSize: 12, color: colors.mid },
-
-  toast: {
-    position: "absolute", bottom: 32, alignSelf: "center",
-    backgroundColor: colors.ink, paddingHorizontal: 22, paddingVertical: 12,
-    borderRadius: 100, shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 12,
-  },
-  toastText: { color: colors.white, fontSize: 13, fontWeight: "600" },
-});
-
-const card = StyleSheet.create({
-  wrap: {
-    backgroundColor: colors.white, borderRadius: 10, borderWidth: 1,
-    borderColor: colors.border, overflow: "hidden",
-    shadowColor: "#000", shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06, shadowRadius: 8, transitionDuration: "150ms",
-  } as any,
-  wrapHover: { shadowOpacity: 0.12, shadowOffset: { width: 0, height: 6 }, shadowRadius: 16, borderColor: colors.mid },
-  img: { width: "100%", height: 160, backgroundColor: colors.bg, alignItems: "center", justifyContent: "center", borderBottomWidth: 1, borderBottomColor: colors.border },
-  serviceImg: { backgroundColor: "#f0f4ff" },
-  eventImg: { backgroundColor: "#fff4f0" },
-  serviceEmoji: { fontSize: 32 },
-  imgLabel: { fontSize: 11, color: colors.mid, letterSpacing: 0.5 },
-  body: { padding: 14, gap: 6 },
-  title: { fontSize: 14, fontWeight: "700", color: colors.ink, lineHeight: 19 },
-  price: { fontSize: 18, fontWeight: "800", color: colors.ink, letterSpacing: -0.3 },
-  meta: { fontSize: 12, color: colors.dark, marginTop: 2 },
-  tags: { flexDirection: "row", gap: 6, marginTop: 6, flexWrap: "wrap" },
-  tag: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 4, borderWidth: 1, borderColor: colors.border },
-  catTag: { backgroundColor: colors.bg, borderColor: colors.bg },
-  freeTag: { backgroundColor: "#e8f5e9", borderColor: "#e8f5e9" },
-  paidTag: { backgroundColor: "#fff8e1", borderColor: "#fff8e1" },
-  tagText: { fontSize: 10, color: colors.dark, fontWeight: "500" },
-  catTagText: { color: colors.mid },
-  freeTagText: { color: "#2e7d32" },
-  paidTagText: { color: "#f57f17" },
-});
-
-const m = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", alignItems: "center", justifyContent: "center" },
-  sheet: {
-    backgroundColor: colors.white, borderRadius: 14, width: 480, maxHeight: "85%",
-    shadowColor: "#000", shadowOffset: { width: 0, height: 20 }, shadowOpacity: 0.25, shadowRadius: 40, overflow: "hidden",
-  },
-  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 24, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: colors.border },
-  heading: { fontSize: 16, fontWeight: "700", color: colors.ink },
-  closeBtn: { fontSize: 16, color: colors.mid, fontWeight: "300" },
-  segmentRow: { flexDirection: "row", paddingHorizontal: 24, paddingVertical: 12, gap: 8, borderBottomWidth: 1, borderBottomColor: colors.border },
-  segment: { flex: 1, paddingVertical: 7, borderRadius: 8, borderWidth: 1.5, borderColor: colors.border, alignItems: "center" },
-  segmentActive: { backgroundColor: colors.ink, borderColor: colors.ink },
-  segmentText: { fontSize: 13, fontWeight: "600", color: colors.dark },
-  segmentTextActive: { color: colors.white },
-  body: { paddingHorizontal: 24, paddingTop: 4, paddingBottom: 24 },
-  label: { fontSize: 11, fontWeight: "700", letterSpacing: 0.5, color: colors.dark, marginTop: 16, marginBottom: 6, textTransform: "uppercase" },
-  input: { borderWidth: 1.5, borderColor: colors.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: colors.ink, outlineStyle: "none" } as any,
-  textarea: { minHeight: 80, textAlignVertical: "top" },
-  pills: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  pill: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1.5, borderColor: colors.border },
-  pillOn: { backgroundColor: colors.ink, borderColor: colors.ink },
-  pillText: { fontSize: 12, color: colors.ink },
-  pillTextOn: { color: colors.white, fontWeight: "600" },
-  freeRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 16 },
-  error: { fontSize: 12, color: "#D32F2F", marginTop: 12 },
-  submitBtn: { backgroundColor: colors.ink, paddingVertical: 14, borderRadius: 10, alignItems: "center", marginTop: 20 },
-  submitBtnDim: { opacity: 0.5 },
-  submitText: { color: colors.white, fontSize: 14, fontWeight: "700" },
-  photoRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  thumb: { width: 72, height: 72, borderRadius: 8, overflow: "hidden", position: "relative" },
-  thumbImg: { width: 72, height: 72 },
-  thumbOverlay: {
-    position: "absolute", top: 0, right: 0, width: 20, height: 20,
-    backgroundColor: "rgba(0,0,0,0.55)", borderBottomLeftRadius: 6,
-    alignItems: "center", justifyContent: "center",
-  },
-  thumbX: { color: colors.white, fontSize: 11, fontWeight: "700" },
-  addPhoto: {
-    width: 72, height: 72, borderRadius: 8, borderWidth: 1.5,
-    borderColor: colors.mid, borderStyle: "dashed", backgroundColor: colors.bg,
-    alignItems: "center", justifyContent: "center", gap: 4,
-  },
-  addPhotoIcon: { fontSize: 20, color: colors.mid, lineHeight: 22 },
-  addPhotoLabel: { fontSize: 9, color: colors.mid, letterSpacing: 0.3 },
-});

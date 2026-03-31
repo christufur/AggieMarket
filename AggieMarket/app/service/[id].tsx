@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import {
-  View, Text, ScrollView, StyleSheet, ActivityIndicator, Pressable, Image, useWindowDimensions,
+  View, Text, ScrollView, StyleSheet, ActivityIndicator, Pressable, Image, useWindowDimensions, Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import { colors } from "../../theme/colors";
 import { useAuth } from "../../context/AuthContext";
 import { API } from "../../constants/api";
@@ -32,7 +33,7 @@ function priceLabel(price: number | null, price_type: string | null) {
 export default function ServiceDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { token } = useAuth();
+  const { user, token } = useAuth();
   const { width } = useWindowDimensions();
   const [service, setService] = useState<ServiceDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -139,9 +140,32 @@ export default function ServiceDetailScreen() {
             <Text style={styles.meta}>{service.view_count} views</Text>
           </View>
 
-          <Pressable style={styles.contactBtn}>
-            <Text style={styles.contactBtnText}>Contact Provider</Text>
-          </Pressable>
+          {String(service.provider_id) === String(user?.id) ? (
+            <Pressable
+              style={styles.deleteBtn}
+              onPress={() => {
+                Alert.alert("Delete Service", "Are you sure you want to delete this service?", [
+                  { text: "Cancel", style: "cancel" },
+                  {
+                    text: "Delete", style: "destructive", onPress: async () => {
+                      await fetch(API.service(service.id), {
+                        method: "DELETE",
+                        headers: { Authorization: `Bearer ${token}` },
+                      });
+                      router.back();
+                    },
+                  },
+                ]);
+              }}
+            >
+              <Ionicons name="trash-outline" size={18} color="#d32f2f" />
+              <Text style={styles.deleteBtnText}>Delete Service</Text>
+            </Pressable>
+          ) : (
+            <Pressable style={styles.contactBtn}>
+              <Text style={styles.contactBtnText}>Contact Provider</Text>
+            </Pressable>
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -170,6 +194,7 @@ const styles = StyleSheet.create({
   },
   imagePlaceholderEmoji: { fontSize: 48 },
   imagePlaceholderText: { fontSize: 13, color: colors.mid },
+  content: { paddingBottom: 40 },
   body: { padding: 16, gap: 12 },
   titleRow: {
     flexDirection: "row",
@@ -202,6 +227,18 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   contactBtnText: { color: colors.white, fontSize: 16, fontWeight: "700" },
+  deleteBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#d32f2f",
+    marginTop: 8,
+  },
+  deleteBtnText: { color: "#d32f2f", fontSize: 16, fontWeight: "700" },
   errorText: { fontSize: 14, color: colors.dark },
   backBtn: { marginTop: 8 },
   backBtnText: { fontSize: 14, color: colors.ink, fontWeight: "600" },

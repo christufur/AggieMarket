@@ -1,8 +1,11 @@
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text, StyleSheet, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import { colors } from "../theme/colors";
 
-export function TopNav() {
+export function TopNav({ onAdd }: { onAdd?: () => void } = {}) {
+  const router = useRouter();
+
   return (
     <View style={styles.container}>
       <View style={styles.logoRow}>
@@ -18,6 +21,9 @@ export function TopNav() {
         <View style={styles.iconBtn}>
           <Ionicons name="mail-outline" size={16} color={colors.dark} />
         </View>
+        <Pressable style={styles.iconBtn} onPress={() => router.push("/profile")}>
+          <Ionicons name="person-outline" size={16} color={colors.dark} />
+        </Pressable>
       </View>
     </View>
   );
