@@ -26,6 +26,7 @@ type EventDetail = {
   status: string;
   view_count: number;
   created_at: string;
+  organizer_name: string | null;
   images: { url: string; sort_order: number }[];
 };
 
@@ -149,7 +150,7 @@ export default function EventDetailScreenWeb() {
                   }}
                 >
                   <img
-                    src={images[imgIdx].url}
+                    src={API.mediaUrl(images[imgIdx].url)}
                     style={{
                       maxWidth: "100%",
                       maxHeight: "100%",
@@ -174,7 +175,7 @@ export default function EventDetailScreenWeb() {
                         }}
                       >
                         <img
-                          src={img.url}
+                          src={API.mediaUrl(img.url)}
                           style={{
                             width: "100%",
                             height: "100%",
@@ -225,6 +226,15 @@ export default function EventDetailScreenWeb() {
               <Separator />
 
               <CardContent className="gap-4 pt-4">
+                {event.organizer_name && (
+                  <View className="flex-row items-center gap-2">
+                    <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: "#FDF2F6", alignItems: "center", justifyContent: "center" }}>
+                      <Ionicons name="person" size={14} color="#8C0B42" />
+                    </View>
+                    <Text className="text-sm font-semibold text-foreground">{event.organizer_name}</Text>
+                  </View>
+                )}
+
                 <View>
                   <Text className="mb-1 text-xs font-bold uppercase tracking-wide text-muted-foreground">
                     When

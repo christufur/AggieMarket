@@ -16,8 +16,11 @@ const eventsRoutes = new Elysia()
         if (!payload) return { message: "Invalid token", status: 401 };
 
         const events = db.query(
-            `SELECT e.*, (SELECT s3_url FROM event_images WHERE event_id = e.id ORDER BY sort_order ASC LIMIT 1) AS image_url
-             FROM events e WHERE e.status = 'active' ORDER BY e.starts_at ASC`
+            `SELECT e.*, u.name AS organizer_name,
+                    (SELECT s3_url FROM event_images WHERE event_id = e.id ORDER BY sort_order ASC LIMIT 1) AS image_url
+             FROM events e
+             LEFT JOIN users u ON u.id = e.organizer_id
+             WHERE e.status = 'active' ORDER BY e.starts_at ASC`
         ).all();
         return { events, status: 200 };
     })
@@ -48,7 +51,11 @@ const eventsRoutes = new Elysia()
 
     // get singular event
     .get("/events/:id", async ({ params }) => {
-        const event = db.query("SELECT * FROM events WHERE id = ? AND status != 'deleted'").get(params.id);
+        const event = db.query(
+            `SELECT e.*, u.name AS organizer_name
+             FROM events e LEFT JOIN users u ON u.id = e.organizer_id
+             WHERE e.id = ? AND e.status != 'deleted'`
+        ).get(params.id);
         if (!event) return { message: "Event not found", status: 404 };
 
         db.run("UPDATE events SET view_count = view_count + 1 WHERE id = ?", [params.id]);
