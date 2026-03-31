@@ -22,4 +22,9 @@ export const API = {
   eventImages: (id: string) => `${BASE}/events/${id}/images`,
   upload: `${BASE}/upload`,
   mediaUrl: (path: string) => `${BASE}${path}`,
+  user: (id: number) => `${BASE}/users/${id}`,
+  userListings: (id: number) => `${BASE}/users/${id}/listings`,
+  userServices: (id: number) => `${BASE}/users/${id}/services`,
+  userEvents: (id: number) => `${BASE}/users/${id}/events`,
+  updateProfile: `${BASE}/users/me`,
 };
