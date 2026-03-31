@@ -62,8 +62,11 @@ const listingsRoutes = new Elysia()
 
         const where = conditions.join(" AND ");
         const listings = db.query(
-            `SELECT l.*, (SELECT s3_url FROM listing_images WHERE listing_id = l.id ORDER BY sort_order ASC LIMIT 1) AS image_url
-             FROM listings l WHERE ${where} ORDER BY l.created_at DESC`
+            `SELECT l.*, u.name AS seller_name,
+                    (SELECT s3_url FROM listing_images WHERE listing_id = l.id ORDER BY sort_order ASC LIMIT 1) AS image_url
+             FROM listings l
+             LEFT JOIN users u ON u.id = l.seller_id
+             WHERE ${where} ORDER BY l.created_at DESC`
         ).all(...params);
 
         return { listings, status: 200 };
@@ -71,7 +74,11 @@ const listingsRoutes = new Elysia()
 
     // GET single listing
     .get("/listings/:id", ({ params }) => {
-        const listing = db.query("SELECT * FROM listings WHERE id = ? AND status != 'deleted'").get(params.id);
+        const listing = db.query(
+            `SELECT l.*, u.name AS seller_name
+             FROM listings l LEFT JOIN users u ON u.id = l.seller_id
+             WHERE l.id = ? AND l.status != 'deleted'`
+        ).get(params.id);
 
         if (!listing) return { message: "Listing not found", status: 404 };
 

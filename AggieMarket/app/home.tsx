@@ -160,7 +160,7 @@ function CreatePostModal({
         await fetch(attachUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ url: API.mediaUrl(uploadData.url), sort_order: i }),
+          body: JSON.stringify({ url: uploadData.url, sort_order: i }),
         });
       }
     }
@@ -573,7 +573,7 @@ export default function HomeScreen() {
                 key={item.id}
                 title={item.title}
                 price={item.is_free ? "Free" : item.price != null ? `$${item.price}` : undefined}
-                imageUrl={item.image_url}
+                imageUrl={item.image_url ? API.mediaUrl(item.image_url) : undefined}
                 listingId={item.id}
               />
             ))
@@ -590,7 +590,7 @@ export default function HomeScreen() {
                 key={item.id}
                 title={item.title}
                 price={item.price != null ? `$${item.price}${item.price_type === "hourly" ? "/hr" : ""}` : undefined}
-                imageUrl={item.image_url}
+                imageUrl={item.image_url ? API.mediaUrl(item.image_url) : undefined}
                 serviceId={item.id}
               />
             ))
@@ -607,7 +607,7 @@ export default function HomeScreen() {
                 key={item.id}
                 title={item.title}
                 sub={`${new Date(item.starts_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })} · ${item.is_free ? "Free" : `$${item.ticket_price}`}`}
-                imageUrl={item.image_url}
+                imageUrl={item.image_url ? API.mediaUrl(item.image_url) : undefined}
                 eventId={item.id}
               />
             ))

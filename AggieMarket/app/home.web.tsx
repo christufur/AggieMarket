@@ -32,6 +32,7 @@ type Listing = {
   condition: string | null;
   created_at: string;
   image_url: string | null;
+  seller_name: string | null;
 };
 
 type Service = {
@@ -43,6 +44,7 @@ type Service = {
   category: string;
   availability: string | null;
   image_url: string | null;
+  provider_name: string | null;
 };
 
 type Event = {
@@ -56,6 +58,7 @@ type Event = {
   is_free: number;
   ticket_price: number | null;
   image_url: string | null;
+  organizer_name: string | null;
 };
 
 type TabType = "listing" | "service" | "event";
@@ -177,7 +180,7 @@ const ListingCard = memo(function ListingCard({ item }: { item: Listing }) {
       >
         {item.image_url ? (
           <Image
-            source={{ uri: item.image_url }}
+            source={{ uri: API.mediaUrl(item.image_url!) }}
             style={{ width: "100%" as any, height: 208, borderTopLeftRadius: 12, borderTopRightRadius: 12 }}
             resizeMode="cover"
           />
@@ -188,6 +191,9 @@ const ListingCard = memo(function ListingCard({ item }: { item: Listing }) {
         )}
         <CardContent className="p-4 gap-2">
           <Text className="text-sm font-bold text-foreground font-display leading-[19px]" numberOfLines={2}>{item.title}</Text>
+          {item.seller_name && (
+            <Text className="text-xs text-muted-foreground mt-0.5">by {item.seller_name}</Text>
+          )}
           <Text className="text-xl font-extrabold font-display tracking-tight" style={{ color: item.is_free ? "#2e7d32" : "#8C0B42" }}>{label}</Text>
           <View className="flex-row gap-1.5 mt-1 flex-wrap">
             {item.condition && (
@@ -231,7 +237,7 @@ const ServiceCard = memo(function ServiceCard({ item }: { item: Service }) {
       >
         {item.image_url ? (
           <Image
-            source={{ uri: item.image_url }}
+            source={{ uri: API.mediaUrl(item.image_url!) }}
             style={{ width: "100%" as any, height: 208, borderTopLeftRadius: 12, borderTopRightRadius: 12 }}
             resizeMode="cover"
           />
@@ -242,6 +248,9 @@ const ServiceCard = memo(function ServiceCard({ item }: { item: Service }) {
         )}
         <CardContent className="p-4 gap-2">
           <Text className="text-sm font-bold text-foreground font-display leading-[19px]" numberOfLines={2}>{item.title}</Text>
+          {item.provider_name && (
+            <Text className="text-xs text-muted-foreground mt-0.5">by {item.provider_name}</Text>
+          )}
           <Text className="text-xl font-extrabold font-display tracking-tight" style={{ color: "#8C0B42" }}>{label}</Text>
           {item.availability ? (
             <Text className="text-xs text-muted-foreground mt-0.5" numberOfLines={1}>{"\u23f0 "}{item.availability}</Text>
@@ -285,7 +294,7 @@ const EventCard = memo(function EventCard({ item }: { item: Event }) {
       >
         {item.image_url ? (
           <Image
-            source={{ uri: item.image_url }}
+            source={{ uri: API.mediaUrl(item.image_url!) }}
             style={{ width: "100%" as any, height: 208, borderTopLeftRadius: 12, borderTopRightRadius: 12 }}
             resizeMode="cover"
           />
@@ -296,6 +305,9 @@ const EventCard = memo(function EventCard({ item }: { item: Event }) {
         )}
         <CardContent className="p-4 gap-2">
           <Text className="text-sm font-bold text-foreground font-display leading-[19px]" numberOfLines={2}>{item.title}</Text>
+          {item.organizer_name && (
+            <Text className="text-xs text-muted-foreground mt-0.5">by {item.organizer_name}</Text>
+          )}
           <Text className="text-xs text-muted-foreground mt-0.5">{"\ud83d\udccd "}{item.location}</Text>
           <Text className="text-xs text-muted-foreground mt-0.5">{"\ud83d\uddd3 "}{formatDate(item.starts_at)}</Text>
           <View className="flex-row gap-1.5 mt-1 flex-wrap">
@@ -378,7 +390,7 @@ function CreatePostModal({
         await fetch(attachUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ url: API.mediaUrl(uploadData.url), sort_order: i }),
+          body: JSON.stringify({ url: uploadData.url, sort_order: i }),
         });
       }
     }
