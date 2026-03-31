@@ -1023,10 +1023,6 @@ export default function HomeWebScreen() {
           </View>
         </View>
 
-        {/* ── Footer ── */}
-        <View className="border-t border-border py-6 items-center">
-          <Text className="text-xs text-muted-foreground">{"\u00a9"} 2026 Aggie Market {"\u00b7"} NMSU Verified</Text>
-        </View>
       </ScrollView>
 
       <Toast message={toastMessage} visible={toastVisible} />

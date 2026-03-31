@@ -174,9 +174,6 @@ export default function LandingScreenWeb() {
           className="items-center"
           style={{ maxWidth: 1100, width: "100%", alignSelf: "center" }}
         >
-          <Text className="text-sm text-muted-foreground">
-            © 2026 Aggie Market · NMSU Verified
-          </Text>
         </View>
       </View>
     </ScrollView>
