@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import {
-  View, Text, ScrollView, StyleSheet, ActivityIndicator, Pressable, Image, useWindowDimensions,
+  View, Text, ScrollView, StyleSheet, ActivityIndicator, Pressable, Image, useWindowDimensions, Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import { colors } from "../../theme/colors";
+import { useAuth } from "../../context/AuthContext";
 import { API } from "../../constants/api";
 
 type ListingDetail = {
@@ -25,6 +27,7 @@ type ListingDetail = {
 export default function ListingDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const { user, token } = useAuth();
   const { width } = useWindowDimensions();
   const [listing, setListing] = useState<ListingDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -118,9 +121,32 @@ export default function ListingDetailScreen() {
             <Text style={styles.meta}>{listing.view_count} views</Text>
           </View>
 
-          <Pressable style={styles.contactBtn}>
-            <Text style={styles.contactBtnText}>Message Seller</Text>
-          </Pressable>
+          {String(listing.seller_id) === String(user?.id) ? (
+            <Pressable
+              style={styles.deleteBtn}
+              onPress={() => {
+                Alert.alert("Delete Listing", "Are you sure you want to delete this listing?", [
+                  { text: "Cancel", style: "cancel" },
+                  {
+                    text: "Delete", style: "destructive", onPress: async () => {
+                      await fetch(API.listing(listing.id), {
+                        method: "DELETE",
+                        headers: { Authorization: `Bearer ${token}` },
+                      });
+                      router.back();
+                    },
+                  },
+                ]);
+              }}
+            >
+              <Ionicons name="trash-outline" size={18} color="#d32f2f" />
+              <Text style={styles.deleteBtnText}>Delete Listing</Text>
+            </Pressable>
+          ) : (
+            <Pressable style={styles.contactBtn}>
+              <Text style={styles.contactBtnText}>Message Seller</Text>
+            </Pressable>
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -147,6 +173,7 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
   },
   imagePlaceholderText: { fontSize: 13, color: colors.mid },
+  content: { paddingBottom: 40 },
   body: { padding: 16, gap: 12 },
   titleRow: {
     flexDirection: "row",
@@ -177,6 +204,18 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   contactBtnText: { color: colors.white, fontSize: 16, fontWeight: "700" },
+  deleteBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#d32f2f",
+    marginTop: 8,
+  },
+  deleteBtnText: { color: "#d32f2f", fontSize: 16, fontWeight: "700" },
   errorText: { fontSize: 14, color: colors.dark },
   backBtn: { marginTop: 8 },
   backBtnText: { fontSize: 14, color: colors.ink, fontWeight: "600" },

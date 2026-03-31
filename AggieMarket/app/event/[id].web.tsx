@@ -1,16 +1,14 @@
 import { useEffect, useState } from "react";
-import {
-  View, Text, ScrollView, StyleSheet, ActivityIndicator, Pressable,
-} from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { View, ScrollView, ActivityIndicator, Pressable } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-// @ts-ignore
-import WaCarousel from "@awesome.me/webawesome/dist/react/carousel";
-// @ts-ignore
-import WaCarouselItem from "@awesome.me/webawesome/dist/react/carousel-item";
-import { colors } from "../../theme/colors";
-import { useAuth } from "../../context/AuthContext";
-import { API } from "../../constants/api";
+import { Ionicons } from "@expo/vector-icons";
+import { useAuth } from "@/context/AuthContext";
+import { API } from "@/constants/api";
+import { Text } from "@/components/ui/text";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
 
 type EventDetail = {
   id: string;
@@ -33,18 +31,23 @@ type EventDetail = {
 
 function formatDateTime(iso: string) {
   return new Date(iso).toLocaleDateString("en-US", {
-    weekday: "short", month: "short", day: "numeric",
-    year: "numeric", hour: "numeric", minute: "2-digit",
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
   });
 }
 
-export default function EventDetailScreen() {
+export default function EventDetailScreenWeb() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { token } = useAuth();
+  const { user, token } = useAuth();
   const [event, setEvent] = useState<EventDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [imgIdx, setImgIdx] = useState(0);
 
   useEffect(() => {
     if (!id || !token) return;
@@ -60,145 +63,270 @@ export default function EventDetailScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.safe} edges={["top"]}>
-        <View style={styles.center}><ActivityIndicator color={colors.ink} /></View>
-      </SafeAreaView>
+      <View
+        className="flex-1 items-center justify-center bg-background"
+        style={{ minHeight: "100vh" as any }}
+      >
+        <ActivityIndicator color="#212121" />
+      </View>
     );
   }
 
   if (error || !event) {
     return (
-      <SafeAreaView style={styles.safe} edges={["top"]}>
-        <View style={styles.center}>
-          <Text style={styles.errorText}>{error || "Something went wrong."}</Text>
-          <Pressable onPress={() => router.back()} style={styles.backBtn}>
-            <Text style={styles.backBtnText}>← Go back</Text>
-          </Pressable>
-        </View>
-      </SafeAreaView>
+      <View
+        className="flex-1 items-center justify-center gap-3 bg-background"
+        style={{ minHeight: "100vh" as any }}
+      >
+        <Text className="text-sm text-muted-foreground">
+          {error || "Something went wrong."}
+        </Text>
+        <Button variant="outline" onPress={() => router.back()}>
+          <Text>Go back</Text>
+        </Button>
+      </View>
     );
   }
 
-  const categories = event.category.split(",").map((c) => c.trim()).filter(Boolean);
-  const ticketLabel = event.is_free ? "Free" : event.ticket_price != null ? `$${event.ticket_price}` : "Paid";
+  const categories = event.category
+    .split(",")
+    .map((c) => c.trim())
+    .filter(Boolean);
+  const ticketLabel = event.is_free
+    ? "Free"
+    : event.ticket_price != null
+      ? `$${event.ticket_price}`
+      : "Paid";
   const date = new Date(event.created_at).toLocaleDateString("en-US", {
-    month: "short", day: "numeric", year: "numeric",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
   });
+  const images = event.images ?? [];
+  const isOwner = String(event.organizer_id) === String(user?.id);
 
   return (
-    <SafeAreaView style={styles.safe} edges={["top"]}>
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()}>
-          <Text style={styles.back}>← Back</Text>
-        </Pressable>
-      </View>
-
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {event.images?.length > 0 ? (
-          <div style={{ width: "100%", height: 300 }}>
-            <WaCarousel navigation={event.images.length > 1} pagination={event.images.length > 1} loop style={{ height: "100%" }}>
-              {event.images.map((img, i) => (
-                <WaCarouselItem key={i}>
-                  <div style={{ position: "relative", width: "100%", height: "300px", overflow: "hidden" }}>
-                    <img src={img.url} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", filter: "blur(24px)", transform: "scale(1.12)", opacity: 0.6 }} alt="" />
-                    <img src={img.url} style={{ position: "relative", width: "100%", height: "100%", objectFit: "contain", zIndex: 1 }} alt="" />
-                  </div>
-                </WaCarouselItem>
-              ))}
-            </WaCarousel>
-          </div>
-        ) : (
-          <View style={styles.imagePlaceholder}>
-            <Text style={styles.imagePlaceholderEmoji}>📅</Text>
-            <Text style={styles.imagePlaceholderText}>No photo</Text>
-          </View>
-        )}
-
-        <View style={styles.body}>
-          <View style={styles.titleRow}>
-            <Text style={styles.title}>{event.title}</Text>
-            <View style={[styles.ticketBadge, event.is_free ? styles.freeBadge : styles.paidBadge]}>
-              <Text style={[styles.ticketBadgeText, event.is_free ? styles.freeText : styles.paidText]}>
-                {ticketLabel}
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.metaRow}>
-            {categories.map((c) => (
-              <View key={c} style={styles.chip}><Text style={styles.chipText}>{c}</Text></View>
-            ))}
-          </View>
-
-          <Text style={styles.sectionLabel}>When</Text>
-          <Text style={styles.metaValue}>🗓 {formatDateTime(event.starts_at)}</Text>
-          {event.ends_at && (
-            <Text style={styles.metaValueSub}>until {formatDateTime(event.ends_at)}</Text>
-          )}
-
-          <Text style={styles.sectionLabel}>Where</Text>
-          <Text style={styles.metaValue}>
-            {event.is_online ? "🌐 Online" : `📍 ${event.location}`}
-          </Text>
-
-          {event.max_attendees != null && (
-            <>
-              <Text style={styles.sectionLabel}>Capacity</Text>
-              <Text style={styles.metaValue}>👥 {event.max_attendees} max attendees</Text>
-            </>
-          )}
-
-          <Text style={styles.sectionLabel}>Description</Text>
-          <Text style={styles.description}>{event.description || "No description provided."}</Text>
-
-          <View style={styles.footerMeta}>
-            <Text style={styles.meta}>Posted {date}</Text>
-            <Text style={styles.meta}>{event.view_count} views</Text>
-          </View>
-
-          <Pressable style={[styles.ctaBtn, event.is_free ? styles.ctaBtnFree : styles.ctaBtnPaid]}>
-            <Text style={styles.ctaBtnText}>
-              {event.is_free ? "RSVP — Free" : `Get Tickets · ${ticketLabel}`}
-            </Text>
+    <ScrollView
+      className="flex-1 bg-background"
+      contentContainerStyle={{ minHeight: "100vh" as any }}
+    >
+      {/* Nav */}
+      <View className="border-b border-border bg-card">
+        <View
+          className="flex-row items-center px-6 py-3"
+          style={{ maxWidth: 900, width: "100%", alignSelf: "center" }}
+        >
+          <Pressable
+            className="flex-row items-center gap-2"
+            onPress={() => router.back()}
+          >
+            <Ionicons name="arrow-back" size={18} color="#212121" />
+            <Text className="text-sm font-semibold text-foreground">Back</Text>
           </Pressable>
         </View>
-      </ScrollView>
-    </SafeAreaView>
+      </View>
+
+      <View
+        className="px-6 py-8"
+        style={{ maxWidth: 900, width: "100%", alignSelf: "center" }}
+      >
+        <View className="flex-row gap-8" style={{ flexWrap: "wrap" }}>
+          {/* Image section */}
+          <View style={{ width: "100%", maxWidth: 440, flexShrink: 0 }}>
+            {images.length > 0 ? (
+              <View>
+                <div
+                  style={{
+                    width: "100%",
+                    maxWidth: 440,
+                    height: 400,
+                    borderRadius: 12,
+                    overflow: "hidden",
+                    background: "#F5F5F5",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <img
+                    src={images[imgIdx].url}
+                    style={{
+                      maxWidth: "100%",
+                      maxHeight: "100%",
+                      objectFit: "contain",
+                    }}
+                    alt={event.title}
+                  />
+                </div>
+                {images.length > 1 && (
+                  <View className="mt-3 flex-row gap-2">
+                    {images.map((img, i) => (
+                      <Pressable
+                        key={i}
+                        onPress={() => setImgIdx(i)}
+                        style={{
+                          width: 60,
+                          height: 60,
+                          borderRadius: 8,
+                          overflow: "hidden",
+                          borderWidth: i === imgIdx ? 2 : 1,
+                          borderColor: i === imgIdx ? "#8C0B42" : "#E0E0E0",
+                        }}
+                      >
+                        <img
+                          src={img.url}
+                          style={{
+                            width: "100%",
+                            height: "100%",
+                            objectFit: "cover",
+                          }}
+                          alt=""
+                        />
+                      </Pressable>
+                    ))}
+                  </View>
+                )}
+              </View>
+            ) : (
+              <View
+                className="items-center justify-center rounded-lg bg-secondary"
+                style={{ width: "100%", maxWidth: 440, height: 400 }}
+              >
+                <Text className="text-muted-foreground">No photo</Text>
+              </View>
+            )}
+          </View>
+
+          {/* Details section */}
+          <View className="flex-1" style={{ minWidth: 280 }}>
+            <Card>
+              <CardHeader className="gap-3">
+                <View className="flex-row items-start justify-between gap-3">
+                  <CardTitle className="flex-1">
+                    <Text>{event.title}</Text>
+                  </CardTitle>
+                  <Badge
+                    variant={event.is_free ? "success" : "outline"}
+                    className="px-3 py-1"
+                  >
+                    <Text>{ticketLabel}</Text>
+                  </Badge>
+                </View>
+
+                <View className="flex-row gap-2" style={{ flexWrap: "wrap" }}>
+                  {categories.map((c) => (
+                    <Badge key={c} variant="secondary">
+                      <Text>{c}</Text>
+                    </Badge>
+                  ))}
+                </View>
+              </CardHeader>
+
+              <Separator />
+
+              <CardContent className="gap-4 pt-4">
+                <View>
+                  <Text className="mb-1 text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                    When
+                  </Text>
+                  <Text className="text-sm text-foreground">
+                    {formatDateTime(event.starts_at)}
+                  </Text>
+                  {event.ends_at && (
+                    <Text className="text-xs text-muted-foreground">
+                      until {formatDateTime(event.ends_at)}
+                    </Text>
+                  )}
+                </View>
+
+                <View>
+                  <Text className="mb-1 text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                    Where
+                  </Text>
+                  <Text className="text-sm text-foreground">
+                    {event.is_online ? "Online" : event.location}
+                  </Text>
+                </View>
+
+                {event.max_attendees != null && (
+                  <View>
+                    <Text className="mb-1 text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                      Capacity
+                    </Text>
+                    <Text className="text-sm text-foreground">
+                      {event.max_attendees} max attendees
+                    </Text>
+                  </View>
+                )}
+
+                <View>
+                  <Text className="mb-1 text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                    Description
+                  </Text>
+                  <Text className="text-sm leading-relaxed text-foreground">
+                    {event.description || "No description provided."}
+                  </Text>
+                </View>
+
+                <Separator />
+
+                <View className="flex-row justify-between">
+                  <Text className="text-xs text-muted-foreground">
+                    Posted {date}
+                  </Text>
+                  <Text className="text-xs text-muted-foreground">
+                    {event.view_count} views
+                  </Text>
+                </View>
+
+                {isOwner ? (
+                  <Button
+                    variant="destructive"
+                    className="mt-2"
+                    onPress={async () => {
+                      if (
+                        !window.confirm(
+                          "Are you sure you want to delete this event?"
+                        )
+                      )
+                        return;
+                      await fetch(API.event(event.id), {
+                        method: "DELETE",
+                        headers: { Authorization: `Bearer ${token}` },
+                      });
+                      router.back();
+                    }}
+                  >
+                    <Ionicons
+                      name="trash-outline"
+                      size={16}
+                      color="#FFFFFF"
+                    />
+                    <Text className="ml-2 text-sm font-semibold text-destructive-foreground">
+                      Delete Event
+                    </Text>
+                  </Button>
+                ) : (
+                  <Button
+                    className="mt-2"
+                    style={
+                      event.is_free
+                        ? { backgroundColor: "#2e7d32" }
+                        : undefined
+                    }
+                  >
+                    <Text className="text-sm font-semibold text-primary-foreground">
+                      {event.is_free
+                        ? "RSVP — Free"
+                        : `Get Tickets · ${ticketLabel}`}
+                    </Text>
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+          </View>
+        </View>
+      </View>
+    </ScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.white },
-  center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12 },
-  header: { paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.border },
-  back: { fontSize: 14, color: colors.ink, fontWeight: "600" },
-  imagePlaceholder: { width: "100%", height: 300, backgroundColor: "#fff4f0", alignItems: "center", justifyContent: "center", borderBottomWidth: 1, borderBottomColor: colors.border, gap: 8 },
-  imagePlaceholderEmoji: { fontSize: 48 },
-  imagePlaceholderText: { fontSize: 13, color: colors.mid },
-  content: { paddingBottom: 40 },
-  body: { padding: 20, gap: 12 },
-  titleRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", gap: 8 },
-  title: { flex: 1, fontSize: 22, fontWeight: "700", color: colors.ink },
-  ticketBadge: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
-  freeBadge: { backgroundColor: "#e8f5e9" },
-  paidBadge: { backgroundColor: "#fff8e1" },
-  ticketBadgeText: { fontSize: 13, fontWeight: "700" },
-  freeText: { color: "#2e7d32" },
-  paidText: { color: "#f57f17" },
-  metaRow: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
-  chip: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, borderWidth: 1, borderColor: colors.border },
-  chipText: { fontSize: 11, color: colors.dark },
-  sectionLabel: { fontSize: 12, fontWeight: "700", color: colors.ink, marginTop: 4 },
-  metaValue: { fontSize: 14, color: colors.dark },
-  metaValueSub: { fontSize: 12, color: colors.mid, marginTop: -8 },
-  description: { fontSize: 14, color: colors.dark, lineHeight: 22 },
-  footerMeta: { flexDirection: "row", justifyContent: "space-between" },
-  meta: { fontSize: 11, color: colors.mid },
-  ctaBtn: { paddingVertical: 14, borderRadius: 10, alignItems: "center", marginTop: 8 },
-  ctaBtnFree: { backgroundColor: "#2e7d32" },
-  ctaBtnPaid: { backgroundColor: colors.ink },
-  ctaBtnText: { color: colors.white, fontSize: 16, fontWeight: "700" },
-  errorText: { fontSize: 14, color: colors.dark },
-  backBtn: { marginTop: 8 },
-  backBtnText: { fontSize: 14, color: colors.ink, fontWeight: "600" },
-});
