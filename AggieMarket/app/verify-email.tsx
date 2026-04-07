@@ -5,11 +5,8 @@ import {
   TextInput,
   Pressable,
   StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
   ActivityIndicator,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { colors } from "../theme/colors";
 import { useAuth } from "../context/AuthContext";
@@ -94,11 +91,7 @@ export default function VerifyEmailScreen() {
     : "";
 
   return (
-    <SafeAreaView style={styles.safe} edges={["top"]}>
-      <KeyboardAvoidingView
-        style={styles.keyboard}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-      >
+    <View style={styles.safe}>
         <View style={styles.content}>
           {/* Header */}
           <View style={styles.header}>
@@ -166,14 +159,12 @@ export default function VerifyEmailScreen() {
             Didn't get it? Check your spam folder or go back and re-register.
           </Text>
         </View>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.white },
-  keyboard: { flex: 1 },
   content: {
     flex: 1,
     paddingHorizontal: 24,

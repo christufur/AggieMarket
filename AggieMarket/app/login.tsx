@@ -1,21 +1,15 @@
 import { useState } from "react";
-import {
-  View,
-  Text,
-  TextInput,
-  Pressable,
-  StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
-  ActivityIndicator,
-} from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { View, Pressable, ActivityIndicator } from "react-native";
 import { useRouter } from "expo-router";
-import { colors } from "../theme/colors";
-import { useAuth } from "../context/AuthContext";
-import { API } from "../constants/api";
+import { useAuth } from "@/context/AuthContext";
+import { API } from "@/constants/api";
+import { Text } from "@/components/ui/text";
+import { Button } from "@/components/ui/button";
+import { Card, CardHeader, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Separator } from "@/components/ui/separator";
 
-export default function LoginScreen() {
+export default function LoginScreenWeb() {
   const router = useRouter();
   const { login } = useAuth();
   const [email, setEmail] = useState("");
@@ -40,13 +34,11 @@ export default function LoginScreen() {
       const data = await res.json();
 
       if (data.token) {
-        // Fetch user profile with the token
         const meRes = await fetch(API.me, {
           headers: { Authorization: `Bearer ${data.token}` },
         });
         const meData = await meRes.json();
         await login(data.token, meData.user);
-        // _layout.tsx will redirect to /home
       } else {
         setError(data.message || "Login failed.");
       }
@@ -58,115 +50,82 @@ export default function LoginScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safe} edges={["top"]}>
-      <KeyboardAvoidingView
-        style={styles.keyboard}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-      >
-        <View style={styles.content}>
-          <View style={styles.header}>
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>AM</Text>
-            </View>
-            <Text style={styles.title}>Log in</Text>
-            <Text style={styles.sub}>Welcome back to Aggie Market</Text>
+    <View
+      className="flex-1 items-center justify-center bg-background px-4"
+      style={{ minHeight: "100vh" as any }}
+    >
+      <Card className="w-full" style={{ maxWidth: 420 }}>
+        <CardHeader className="items-center gap-3 pb-2">
+          <View className="rounded-md bg-primary px-3 py-1.5">
+            <Text className="text-xs font-bold tracking-wide text-primary-foreground">
+              AM
+            </Text>
           </View>
+          <Text className="text-2xl font-bold text-foreground">Log in</Text>
+          <Text className="text-sm text-muted-foreground">
+            Welcome back to Aggie Market
+          </Text>
+        </CardHeader>
 
-          <View style={styles.form}>
-            <Text style={styles.label}>Email</Text>
-            <TextInput
-              style={styles.input}
+        <Separator />
+
+        <CardContent className="gap-5 pt-6">
+          <View className="gap-1.5">
+            <Text className="text-sm font-semibold text-foreground">Email</Text>
+            <Input
               value={email}
               onChangeText={setEmail}
               placeholder="you@nmsu.edu"
-              placeholderTextColor={colors.mid}
               autoCapitalize="none"
               keyboardType="email-address"
               autoComplete="email"
               editable={!loading}
             />
-            <Text style={styles.label}>Password</Text>
-            <TextInput
-              style={styles.input}
+          </View>
+
+          <View className="gap-1.5">
+            <Text className="text-sm font-semibold text-foreground">
+              Password
+            </Text>
+            <Input
               value={password}
               onChangeText={setPassword}
-              placeholder="••••••••"
-              placeholderTextColor={colors.mid}
+              placeholder="Enter your password"
               secureTextEntry
               autoComplete="password"
               editable={!loading}
             />
-
-            {error ? <Text style={styles.errorText}>{error}</Text> : null}
-
-            <Pressable
-              style={[styles.primaryBtn, loading && styles.primaryBtnDisabled]}
-              onPress={handleLogin}
-              disabled={loading}
-            >
-              {loading ? (
-                <ActivityIndicator color={colors.white} />
-              ) : (
-                <Text style={styles.primaryBtnText}>Log in</Text>
-              )}
-            </Pressable>
           </View>
 
-          <Pressable onPress={() => router.push("/register")} style={styles.switchLink}>
-            <Text style={styles.switchLinkText}>Don't have an account? Sign up</Text>
-          </Pressable>
-          <Pressable onPress={() => router.back()} style={styles.backLink}>
-            <Text style={styles.backLinkText}>← Back</Text>
-          </Pressable>
-        </View>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+          {error ? (
+            <Text className="text-sm font-medium text-destructive">
+              {error}
+            </Text>
+          ) : null}
+
+          <Button onPress={handleLogin} disabled={loading} className="mt-1">
+            {loading ? (
+              <View className="flex-row items-center gap-2">
+                <ActivityIndicator color="#FFFFFF" size="small" />
+                <Text className="text-sm font-semibold text-primary-foreground">
+                  Logging in...
+                </Text>
+              </View>
+            ) : (
+              <Text className="text-sm font-semibold text-primary-foreground">
+                Log in
+              </Text>
+            )}
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Pressable onPress={() => router.push("/register")} className="mt-6">
+        <Text className="text-sm text-muted-foreground">
+          Don't have an account?{" "}
+          <Text className="font-semibold text-foreground">Sign up</Text>
+        </Text>
+      </Pressable>
+    </View>
   );
 }
-
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.white },
-  keyboard: { flex: 1 },
-  content: { flex: 1, paddingHorizontal: 24, paddingTop: 24 },
-  header: { marginBottom: 32 },
-  badge: {
-    alignSelf: "flex-start",
-    backgroundColor: colors.ink,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 4,
-    marginBottom: 16,
-  },
-  badgeText: { color: colors.white, fontSize: 12, fontWeight: "700" },
-  title: { fontSize: 24, fontWeight: "700", color: colors.ink, marginBottom: 4 },
-  sub: { fontSize: 14, color: colors.dark },
-  form: { gap: 16 },
-  label: { fontSize: 12, fontWeight: "700", color: colors.ink },
-  input: {
-    borderWidth: 1.5,
-    borderColor: colors.mid,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 14,
-    color: colors.ink,
-  },
-  errorText: {
-    fontSize: 13,
-    color: "#D32F2F",
-    fontWeight: "500",
-  },
-  primaryBtn: {
-    backgroundColor: colors.ink,
-    paddingVertical: 14,
-    borderRadius: 10,
-    alignItems: "center",
-    marginTop: 8,
-  },
-  primaryBtnDisabled: { opacity: 0.5 },
-  primaryBtnText: { color: colors.white, fontSize: 16, fontWeight: "700" },
-  switchLink: { marginTop: 24 },
-  switchLinkText: { fontSize: 14, color: colors.ink, fontWeight: "600" },
-  backLink: { marginTop: 12 },
-  backLinkText: { fontSize: 14, color: colors.dark },
-});
