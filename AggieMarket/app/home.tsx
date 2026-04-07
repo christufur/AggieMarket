@@ -884,7 +884,7 @@ export default function HomeWebScreen() {
 
           <View className="flex-row items-center gap-2 shrink-0">
             {!isMobile && (
-              <Pressable className="w-9 h-9 border-[1.5px] border-border rounded-lg items-center justify-center">
+              <Pressable className="w-9 h-9 border-[1.5px] border-border rounded-lg items-center justify-center" onPress={() => router.push("/inbox")}>
                 <Ionicons name="chatbubble-outline" size={16} color="#757575" />
               </Pressable>
             )}
