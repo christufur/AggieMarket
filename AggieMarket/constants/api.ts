@@ -6,7 +6,8 @@ const BASE = Platform.OS === "web"
   ? (process.env.EXPO_PUBLIC_API_URL_ANDROID ?? "http://10.0.2.2:3000")
   : (process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000");
 
-const WS_BASE = BASE.replace(/^https/, "wss").replace(/^http/, "ws");
+/** `http` → `ws`, `https` → `wss` */
+const WS_BASE = BASE.replace(/^http/, "ws");
 
 export const API = {
   register: `${BASE}/auth/register`,
@@ -30,8 +31,10 @@ export const API = {
   userEvents: (id: number) => `${BASE}/users/${id}/events`,
   updateProfile: `${BASE}/users/me`,
   conversations: `${BASE}/conversations`,
+  conversation: (id: string) => `${BASE}/conversations/${id}`,
   conversationMessages: (id: string) => `${BASE}/conversations/${id}/messages`,
+  conversationUnreadCount: `${BASE}/conversations/unread-count`,
   conversationRead: (id: string) => `${BASE}/conversations/${id}/read`,
-  unreadCount: `${BASE}/conversations/unread-count`,
-  wsChat: `${WS_BASE}/ws/chat`,
+  wsChat: (token: string) =>
+    `${WS_BASE}/ws/chat?token=${encodeURIComponent(token)}`,
 };

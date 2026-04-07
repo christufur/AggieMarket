@@ -1,5 +1,3 @@
-import type { ServerWebSocket } from "bun";
-
 // Tracks online users so REST routes can push WS events after sending a message
 
 // TODO: Store a Map<number, Set<ServerWebSocket>> (userId -> open WS connections)
