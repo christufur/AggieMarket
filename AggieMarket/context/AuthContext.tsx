@@ -1,6 +1,4 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
-import { Platform } from "react-native";
-import * as SecureStore from "expo-secure-store";
 import { API } from "../constants/api";
 
 type User = {
@@ -22,20 +20,10 @@ const AuthContext = createContext<AuthContextType | null>(null);
 
 const TOKEN_KEY = "aggie_token";
 
-// Web uses localStorage, native uses SecureStore
 const storage = {
-  get: async (key: string) => {
-    if (Platform.OS === "web") return localStorage.getItem(key);
-    return SecureStore.getItemAsync(key);
-  },
-  set: async (key: string, value: string) => {
-    if (Platform.OS === "web") { localStorage.setItem(key, value); return; }
-    return SecureStore.setItemAsync(key, value);
-  },
-  delete: async (key: string) => {
-    if (Platform.OS === "web") { localStorage.removeItem(key); return; }
-    return SecureStore.deleteItemAsync(key);
-  },
+  get: (key: string) => localStorage.getItem(key),
+  set: (key: string, value: string) => localStorage.setItem(key, value),
+  delete: (key: string) => localStorage.removeItem(key),
 };
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -46,7 +34,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     (async () => {
       try {
-        const stored = await storage.get(TOKEN_KEY);
+        const stored = storage.get(TOKEN_KEY);
         if (stored) {
           const res = await fetch(API.me, {
             headers: { Authorization: `Bearer ${stored}` },
@@ -56,7 +44,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setToken(stored);
             setUser(data.user);
           } else {
-            await storage.delete(TOKEN_KEY);
+            storage.delete(TOKEN_KEY);
           }
         }
       } catch {
@@ -68,13 +56,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = async (newToken: string, newUser: User) => {
-    await storage.set(TOKEN_KEY, newToken);
+    storage.set(TOKEN_KEY, newToken);
     setToken(newToken);
     setUser(newUser);
   };
 
   const logout = async () => {
-    await storage.delete(TOKEN_KEY);
+    storage.delete(TOKEN_KEY);
     setToken(null);
     setUser(null);
   };

@@ -1,14 +1,16 @@
 import { useEffect, useState, useCallback } from "react";
 import {
-  View, ScrollView, ActivityIndicator, Pressable, Image, Alert, Platform,
+  View, ScrollView, ActivityIndicator, Pressable, Image, Platform,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Text } from "@/components/ui/text";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import {
+  Avatar as FacehashAvatar,
+  AvatarImage as FacehashAvatarImage,
+  AvatarFallback as FacehashAvatarFallback,
+} from "facehash";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
@@ -20,106 +22,49 @@ import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/context/AuthContext";
 import { API } from "@/constants/api";
 
-type ProfileData = {
-  id: number;
-  name: string;
-  bio: string | null;
-  avatar_url: string | null;
-  cover_url: string | null;
-  rating_avg: number;
-  rating_count: number;
-  created_at: string;
-  listings_count: number;
-  services_count: number;
-  events_count: number;
-};
+// ── Types ────────────────────────────────────────────────────────────────────
 
+type ProfileData = {
+  id: number; name: string; bio: string | null;
+  avatar_url: string | null; cover_url: string | null;
+  rating_avg: number; rating_count: number; created_at: string;
+  listings_count: number; services_count: number; events_count: number;
+};
 type ListingItem = {
   id: string; title: string; price: number | null;
-  is_free: number; status: string; image_url: string | null;
+  is_free: number; status: string; image_url: string | null; created_at: string;
 };
-
 type ServiceItem = {
   id: string; title: string; price: number | null;
-  price_type: string | null; image_url: string | null;
+  price_type: string | null; image_url: string | null; created_at: string;
 };
-
 type EventItem = {
   id: string; title: string; starts_at: string;
-  is_free: number; ticket_price: number | null; image_url: string | null;
+  is_free: number; ticket_price: number | null; image_url: string | null; created_at: string;
 };
 
-function confirmAction(title: string, message: string, onConfirm: () => void) {
-  if (Platform.OS === "web") {
-    if (window.confirm(`${title}\n${message}`)) onConfirm();
-  } else {
-    Alert.alert(title, message, [
-      { text: "Cancel", style: "cancel" },
-      { text: "Confirm", style: "destructive", onPress: onConfirm },
-    ]);
-  }
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+function fmtDate(iso: string) {
+  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
-function StatBlock({ label, value }: { label: string; value: string | number }) {
+function fmtJoined(iso: string) {
+  return "Joined " + new Date(iso).toLocaleDateString("en-US", { month: "long", year: "numeric" });
+}
+
+// ── Sub-components ───────────────────────────────────────────────────────────
+
+function ProfileInfoRow({ icon, label }: { icon: keyof typeof Ionicons.glyphMap; label: string }) {
   return (
-    <View className="items-center px-4">
-      <Text className="text-lg font-bold text-foreground">{value}</Text>
-      <Text className="text-xs text-muted-foreground">{label}</Text>
+    <View className="flex-row items-center gap-2 py-1">
+      <Ionicons name={icon} size={15} color="#757575" />
+      <Text className="text-sm text-muted-foreground">{label}</Text>
     </View>
   );
 }
 
-function ItemRow({
-  imageUrl,
-  title,
-  subtitle,
-  badge,
-  badgeVariant,
-  onPress,
-  onDelete,
-  icon,
-}: {
-  imageUrl: string | null;
-  title: string;
-  subtitle: string;
-  badge?: string;
-  badgeVariant?: "success" | "destructive" | "outline" | "secondary";
-  onPress: () => void;
-  onDelete: () => void;
-  icon: keyof typeof Ionicons.glyphMap;
-}) {
-  return (
-    <Card className="mb-2 overflow-hidden">
-      <Pressable className="flex-row items-center" onPress={onPress}>
-        {imageUrl ? (
-          <Image
-            source={{ uri: API.mediaUrl(imageUrl) }}
-            className="w-16 h-16"
-            resizeMode="cover"
-          />
-        ) : (
-          <View className="w-16 h-16 items-center justify-center bg-muted">
-            <Ionicons name={icon} size={22} color="#BDBDBD" />
-          </View>
-        )}
-        <View className="flex-1 px-3 py-2">
-          <Text className="text-sm font-semibold text-foreground" numberOfLines={1}>
-            {title}
-          </Text>
-          <Text className="text-xs text-muted-foreground mt-0.5">{subtitle}</Text>
-          {badge && (
-            <Badge variant={badgeVariant ?? "outline"} className="mt-1 self-start">
-              <Text>{badge}</Text>
-            </Badge>
-          )}
-        </View>
-        <Pressable className="p-3 active:opacity-60" onPress={onDelete}>
-          <Ionicons name="trash-outline" size={18} color="#d32f2f" />
-        </Pressable>
-      </Pressable>
-    </Card>
-  );
-}
+// ── Main ─────────────────────────────────────────────────────────────────────
 
 export default function ProfileScreen() {
   const { user, token, logout } = useAuth();
@@ -129,10 +74,9 @@ export default function ProfileScreen() {
   const [listings, setListings] = useState<ListingItem[]>([]);
   const [services, setServices] = useState<ServiceItem[]>([]);
   const [events, setEvents] = useState<EventItem[]>([]);
-  const [activeTab, setActiveTab] = useState("listings");
   const [loading, setLoading] = useState(true);
+  const [contentTab, setContentTab] = useState<"listings" | "services" | "events">("listings");
 
-  // Edit dialog
   const [editOpen, setEditOpen] = useState(false);
   const [editName, setEditName] = useState("");
   const [editBio, setEditBio] = useState("");
@@ -154,17 +98,16 @@ export default function ProfileScreen() {
       if (lData.listings) setListings(lData.listings);
       if (sData.services) setServices(sData.services);
       if (eData.events) setEvents(eData.events);
-    } catch { /* ignore */ }
+    } catch (err) { console.error("Profile fetch error:", err); }
     finally { setLoading(false); }
   }, [user, token]);
 
   useEffect(() => { fetchProfile(); }, [fetchProfile]);
 
-  const handleLogout = () => {
-    confirmAction("Log Out", "Are you sure you want to log out?", async () => {
-      await logout();
-      router.replace("/");
-    });
+  const handleLogout = async () => {
+    if (!window.confirm("Are you sure you want to log out?")) return;
+    await logout();
+    router.replace("/");
   };
 
   const handleEditSave = async () => {
@@ -185,227 +128,384 @@ export default function ProfileScreen() {
     finally { setSaving(false); }
   };
 
-  const deleteListing = (id: string) =>
-    confirmAction("Delete Listing", "This cannot be undone.", async () => {
-      await fetch(API.listing(id), { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
-      setListings((p) => p.filter((l) => l.id !== id));
-    });
-
-  const deleteService = (id: string) =>
-    confirmAction("Delete Service", "This cannot be undone.", async () => {
-      await fetch(API.service(id), { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
-      setServices((p) => p.filter((s) => s.id !== id));
-    });
-
-  const deleteEvent = (id: string) =>
-    confirmAction("Delete Event", "This cannot be undone.", async () => {
-      await fetch(API.event(id), { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
-      setEvents((p) => p.filter((e) => e.id !== id));
-    });
+  const deleteListing = async (id: string) => {
+    if (!window.confirm("Delete this listing?")) return;
+    await fetch(API.listing(id), { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+    setListings((p) => p.filter((l) => l.id !== id));
+  };
+  const deleteService = async (id: string) => {
+    if (!window.confirm("Delete this service?")) return;
+    await fetch(API.service(id), { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+    setServices((p) => p.filter((s) => s.id !== id));
+  };
+  const deleteEvent = async (id: string) => {
+    if (!window.confirm("Delete this event?")) return;
+    await fetch(API.event(id), { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+    setEvents((p) => p.filter((e) => e.id !== id));
+  };
 
   if (loading) {
     return (
-      <SafeAreaView className="flex-1 bg-background" edges={["top"]}>
-        <View className="flex-1 items-center justify-center">
-          <ActivityIndicator color="#212121" />
-        </View>
-      </SafeAreaView>
+      <View className="flex-1 items-center justify-center bg-background" style={{ minHeight: "100vh" as any }}>
+        <ActivityIndicator color="#212121" />
+      </View>
     );
   }
 
-  const memberSince = profile
-    ? new Date(profile.created_at).toLocaleDateString("en-US", { month: "long", year: "numeric" })
-    : "";
-
-  const initials = (profile?.name ?? user?.name ?? "?")
-    .split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2);
 
   return (
-    <SafeAreaView className="flex-1 bg-background" edges={["top"]}>
-      {/* Header bar */}
-      <View className="flex-row items-center justify-between px-4 py-3 bg-card border-b border-border">
-        <Pressable onPress={() => router.back()} className="flex-row items-center gap-1">
-          <Ionicons name="chevron-back" size={20} color="#212121" />
-          <Text className="text-sm font-semibold text-foreground">Back</Text>
-        </Pressable>
-        <Text className="text-base font-bold text-foreground">Profile</Text>
-        <Pressable onPress={() => {
-          setEditName(profile?.name ?? user?.name ?? "");
-          setEditBio(profile?.bio ?? "");
-          setEditOpen(true);
-        }}>
-          <Ionicons name="create-outline" size={20} color="#212121" />
-        </Pressable>
-      </View>
-
+    <View className="flex-1 bg-background" style={{ minHeight: "100vh" as any }}>
       <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
-        {/* Cover photo */}
-        <View className="h-36 bg-muted">
-          {profile?.cover_url && (
-            <Image
-              source={{ uri: API.mediaUrl(profile.cover_url) }}
-              className="w-full h-36"
-              resizeMode="cover"
-            />
-          )}
+        {/* ── Top nav bar ── */}
+        <View className="bg-card border-b border-border px-6 py-3">
+          <View className="flex-row items-center justify-between" style={{ maxWidth: 1100, marginHorizontal: "auto", width: "100%" }}>
+            <View className="flex-row items-center gap-3">
+              <Pressable onPress={() => router.push("/home")} className="flex-row items-center gap-1.5">
+                <View className="bg-primary rounded px-1.5 py-0.5">
+                  <Text className="text-xs font-bold text-primary-foreground">AM</Text>
+                </View>
+                <Text className="text-sm font-semibold text-foreground">Home</Text>
+              </Pressable>
+              <Ionicons name="chevron-forward" size={12} color="#BDBDBD" />
+              <Text className="text-sm text-muted-foreground">User</Text>
+            </View>
+            <View className="flex-row items-center gap-2">
+              <Pressable
+                className="p-2 rounded-md hover:bg-muted"
+                onPress={handleLogout}
+              >
+                <Ionicons name="log-out-outline" size={18} color="#757575" />
+              </Pressable>
+            </View>
+          </View>
         </View>
 
-        {/* Avatar + Info */}
-        <View className="items-center -mt-12 px-4 pb-4">
-          <Avatar alt={profile?.name ?? "Profile"} className="h-24 w-24 border-4 border-card">
-            {profile?.avatar_url ? (
-              <AvatarImage source={{ uri: API.mediaUrl(profile.avatar_url) }} />
-            ) : null}
-            <AvatarFallback className="bg-primary">
-              <Text className="text-2xl font-bold text-primary-foreground">{initials}</Text>
-            </AvatarFallback>
-          </Avatar>
-
-          <Text className="text-xl font-bold text-foreground mt-3">
-            {profile?.name ?? user?.name}
-          </Text>
-
-          <View className="flex-row items-center gap-1.5 mt-1">
-            <Ionicons name="shield-checkmark" size={14} color="#2e7d32" />
-            <Text className="text-sm text-muted-foreground">{user?.email}</Text>
-          </View>
-
-          {profile?.bio ? (
-            <Text className="text-sm text-muted-foreground text-center mt-2 px-6 leading-5">
-              {profile.bio}
-            </Text>
-          ) : null}
-
-          {/* Stats row */}
-          <View className="flex-row items-center mt-4">
-            <StatBlock label="Listings" value={listings.length} />
-            <Separator orientation="vertical" className="h-8" />
-            <StatBlock label="Services" value={services.length} />
-            <Separator orientation="vertical" className="h-8" />
-            <StatBlock label="Events" value={events.length} />
-            {profile && profile.rating_count > 0 && (
-              <>
-                <Separator orientation="vertical" className="h-8" />
-                <StatBlock
-                  label="Rating"
-                  value={`${profile.rating_avg.toFixed(1)} (${profile.rating_count})`}
-                />
-              </>
+        {/* ── Cover photo ── */}
+        <View style={{ maxWidth: 1100, marginHorizontal: "auto", width: "100%" }}>
+          <View className="relative" style={{ height: 200 }}>
+            {profile?.cover_url ? (
+              <Image
+                source={{ uri: API.mediaUrl(profile.cover_url) }}
+                style={{ width: "100%", height: 200, borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }}
+                resizeMode="cover"
+              />
+            ) : (
+              <div style={{
+                width: "100%", height: 200,
+                background: "linear-gradient(135deg, #8C0B42 0%, #5E072D 50%, #380418 100%)",
+                borderRadius: 0,
+              }} />
             )}
+            {/* Edit cover button */}
+            <Pressable
+              className="absolute top-3 right-3 bg-card/80 rounded-md px-3 py-1.5 flex-row items-center gap-1.5"
+              onPress={() => {
+                setEditName(profile?.name ?? user?.name ?? "");
+                setEditBio(profile?.bio ?? "");
+                setEditOpen(true);
+              }}
+            >
+              <Ionicons name="create-outline" size={14} color="#212121" />
+              <Text className="text-xs font-medium text-foreground">Edit</Text>
+            </Pressable>
           </View>
 
-          <Text className="text-xs text-muted-foreground mt-3">
-            Member since {memberSince}
-          </Text>
-        </View>
+          {/* ── Avatar + Name row ── */}
+          <View className="items-center -mt-16 mb-4">
+            <FacehashAvatar
+              className="h-28 w-28 rounded-full overflow-hidden border-4 border-white shadow-md"
+              style={{ width: 112, height: 112 }}
+            >
+              {profile?.avatar_url ? (
+                <FacehashAvatarImage
+                  src={API.mediaUrl(profile.avatar_url)}
+                  alt={profile?.name ?? "Profile"}
+                />
+              ) : null}
+              <FacehashAvatarFallback
+                name={profile?.name ?? user?.name ?? user?.email ?? "User"}
+                facehash
+                facehashProps={{
+                  size: 112,
+                  variant: "gradient",
+                  intensity3d: "dramatic",
+                  interactive: true,
+                  enableBlink: true,
+                  showInitial: true,
+                  colors: ["#6C63FF", "#F857A6", "#FF5858", "#11998E", "#F2994A", "#2D9CDB"],
+                }}
+              />
+            </FacehashAvatar>
 
-        <Separator />
+            <Text className="text-2xl font-bold text-foreground mt-3">
+              {profile?.name ?? user?.name}
+            </Text>
 
-        {/* Tabs section */}
-        <View className="px-4 pt-4 pb-6">
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="mb-4">
-              <TabsTrigger value="listings">
-                <Text>Listings</Text>
-              </TabsTrigger>
-              <TabsTrigger value="services">
-                <Text>Services</Text>
-              </TabsTrigger>
-              <TabsTrigger value="events">
-                <Text>Events</Text>
-              </TabsTrigger>
-            </TabsList>
+            {/* Meta badges */}
+            <View className="flex-row items-center gap-3 mt-2 flex-wrap justify-center">
+              <Badge variant="outline" className="gap-1 px-3 py-1">
+                <Ionicons name="school-outline" size={12} color="#757575" />
+                <Text>NMSU Student</Text>
+              </Badge>
+              <Badge variant="outline" className="gap-1 px-3 py-1">
+                <Ionicons name="shield-checkmark-outline" size={12} color="#2e7d32" />
+                <Text>Verified</Text>
+              </Badge>
+              <Badge variant="outline" className="gap-1 px-3 py-1">
+                <Ionicons name="calendar-outline" size={12} color="#757575" />
+                <Text>{fmtJoined(profile?.created_at ?? new Date().toISOString())}</Text>
+              </Badge>
+            </View>
+          </View>
 
-            <TabsContent value="listings">
-              {listings.length === 0 ? (
-                <EmptyState icon="pricetag-outline" label="No listings yet" />
-              ) : (
-                listings.map((item) => (
-                  <ItemRow
-                    key={item.id}
-                    imageUrl={item.image_url}
-                    title={item.title}
-                    subtitle={item.is_free ? "Free" : item.price != null ? `$${item.price}` : "—"}
-                    badge={item.status === "sold" ? "SOLD" : undefined}
-                    badgeVariant="destructive"
-                    icon="image-outline"
-                    onPress={() => router.push(`/listing/${item.id}`)}
-                    onDelete={() => deleteListing(item.id)}
-                  />
-                ))
-              )}
-            </TabsContent>
+          <View>
+            {/* ── Two-column layout ── */}
+              <View className="flex-row gap-6 px-4 py-6" style={{ flexWrap: "wrap" }}>
+                {/* Left column — About */}
+                <View style={{ width: 300, flexShrink: 0 }}>
+                  <Card>
+                    <CardHeader>
+                      <Text className="text-sm font-semibold text-foreground">About</Text>
+                    </CardHeader>
+                    <CardContent>
+                      <Text className="text-sm text-foreground">
+                        {profile?.bio || "No bio yet. Click Edit Profile to add one."}
+                      </Text>
+                      <Separator className="my-3" />
+                      <ProfileInfoRow icon="mail-outline" label={user?.email ?? ""} />
+                      {profile && profile.rating_count > 0 && (
+                        <ProfileInfoRow icon="star-outline" label={`${profile.rating_avg.toFixed(1)} avg (${profile.rating_count} reviews)`} />
+                      )}
+                    </CardContent>
+                  </Card>
+                </View>
 
-            <TabsContent value="services">
-              {services.length === 0 ? (
-                <EmptyState icon="construct-outline" label="No services yet" />
-              ) : (
-                services.map((item) => (
-                  <ItemRow
-                    key={item.id}
-                    imageUrl={item.image_url}
-                    title={item.title}
-                    subtitle={
-                      item.price != null
-                        ? `$${item.price}${item.price_type === "hourly" ? "/hr" : ""}`
-                        : "Free"
-                    }
-                    icon="construct-outline"
-                    onPress={() => router.push(`/service/${item.id}`)}
-                    onDelete={() => deleteService(item.id)}
-                  />
-                ))
-              )}
-            </TabsContent>
+                {/* Right column — Tabbed content */}
+                <View style={{ flex: 1, minWidth: 300 }}>
+                  <Card>
+                    {/* Tab pills */}
+                    <View className="flex-row gap-1 px-4 pt-4 pb-3 border-b border-border">
+                      {([
+                        { key: "listings" as const, label: "Listings", count: listings.length },
+                        { key: "services" as const, label: "Services", count: services.length },
+                        { key: "events" as const, label: "Events", count: events.length },
+                      ]).map(({ key, label, count }) => (
+                        <Pressable
+                          key={key}
+                          className="px-4 py-2 rounded-full"
+                          style={contentTab === key ? { backgroundColor: "#FDF2F6" } : undefined}
+                          onPress={() => setContentTab(key)}
+                        >
+                          <Text className="text-sm font-semibold" style={{ color: contentTab === key ? "#8C0B42" : "#757575" }}>
+                            {label} ({count})
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </View>
 
-            <TabsContent value="events">
-              {events.length === 0 ? (
-                <EmptyState icon="calendar-outline" label="No events yet" />
-              ) : (
-                events.map((item) => (
-                  <ItemRow
-                    key={item.id}
-                    imageUrl={item.image_url}
-                    title={item.title}
-                    subtitle={
-                      item.is_free
-                        ? "Free"
-                        : item.ticket_price != null
-                        ? `$${item.ticket_price}`
-                        : "Paid"
-                    }
-                    badge={new Date(item.starts_at).toLocaleDateString("en-US", {
-                      month: "short", day: "numeric",
-                    })}
-                    badgeVariant="secondary"
-                    icon="calendar-outline"
-                    onPress={() => router.push(`/event/${item.id}`)}
-                    onDelete={() => deleteEvent(item.id)}
-                  />
-                ))
-              )}
-            </TabsContent>
-          </Tabs>
-        </View>
+                    <CardContent className="pt-4">
+                      {/* Listings */}
+                      {contentTab === "listings" && (
+                        listings.length === 0 ? (
+                          <View className="items-center py-10">
+                            <Ionicons name="pricetag-outline" size={24} color="#BDBDBD" />
+                            <Text className="text-sm text-muted-foreground mt-2">No listings yet</Text>
+                          </View>
+                        ) : (
+                          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12 }}>
+                            {listings.map((item) => (
+                              <Card key={item.id} className="overflow-hidden">
+                                <Pressable onPress={() => router.push(`/listing/${item.id}`)}>
+                                  {item.image_url ? (
+                                    <Image source={{ uri: API.mediaUrl(item.image_url) }} style={{ width: "100%" as any, height: 120 }} resizeMode="cover" />
+                                  ) : (
+                                    <View className="w-full items-center justify-center bg-muted" style={{ height: 120 }}>
+                                      <Ionicons name="image-outline" size={24} color="#BDBDBD" />
+                                    </View>
+                                  )}
+                                  <CardContent className="p-3 gap-1">
+                                    <Text className="text-sm font-semibold text-foreground" numberOfLines={1}>{item.title}</Text>
+                                    <View className="flex-row items-center justify-between">
+                                      <Text className="text-sm font-bold" style={{ color: "#8C0B42" }}>
+                                        {item.is_free ? "Free" : item.price != null ? `$${item.price}` : "—"}
+                                      </Text>
+                                      {item.status === "sold" && <Badge variant="destructive"><Text>SOLD</Text></Badge>}
+                                    </View>
+                                  </CardContent>
+                                </Pressable>
+                                <View className="px-3 pb-2">
+                                  <Pressable className="flex-row items-center gap-1 self-end p-1 rounded hover:bg-muted" onPress={() => deleteListing(item.id)}>
+                                    <Ionicons name="trash-outline" size={13} color="#d32f2f" />
+                                    <Text className="text-xs" style={{ color: "#d32f2f" }}>Delete</Text>
+                                  </Pressable>
+                                </View>
+                              </Card>
+                            ))}
+                          </div>
+                        )
+                      )}
 
-        {/* Logout */}
-        <View className="px-4 pb-10">
-          <Button variant="outline" className="border-destructive" onPress={handleLogout}>
-            <Ionicons name="log-out-outline" size={16} color="#d32f2f" />
-            <Text className="text-destructive font-semibold ml-2">Log Out</Text>
-          </Button>
+                      {/* Services */}
+                      {contentTab === "services" && (
+                        services.length === 0 ? (
+                          <View className="items-center py-10">
+                            <Ionicons name="construct-outline" size={24} color="#BDBDBD" />
+                            <Text className="text-sm text-muted-foreground mt-2">No services yet</Text>
+                          </View>
+                        ) : (
+                          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12 }}>
+                            {services.map((item) => (
+                              <Card key={item.id} className="overflow-hidden">
+                                <Pressable onPress={() => router.push(`/service/${item.id}`)}>
+                                  {item.image_url ? (
+                                    <Image source={{ uri: API.mediaUrl(item.image_url) }} style={{ width: "100%" as any, height: 120 }} resizeMode="cover" />
+                                  ) : (
+                                    <View className="w-full items-center justify-center bg-muted" style={{ height: 120 }}>
+                                      <Ionicons name="construct-outline" size={24} color="#BDBDBD" />
+                                    </View>
+                                  )}
+                                  <CardContent className="p-3 gap-1">
+                                    <Text className="text-sm font-semibold text-foreground" numberOfLines={1}>{item.title}</Text>
+                                    <Text className="text-sm font-bold" style={{ color: "#8C0B42" }}>
+                                      {item.price != null ? `$${item.price}${item.price_type === "hourly" ? "/hr" : ""}` : "Free"}
+                                    </Text>
+                                  </CardContent>
+                                </Pressable>
+                                <View className="px-3 pb-2">
+                                  <Pressable className="flex-row items-center gap-1 self-end p-1 rounded hover:bg-muted" onPress={() => deleteService(item.id)}>
+                                    <Ionicons name="trash-outline" size={13} color="#d32f2f" />
+                                    <Text className="text-xs" style={{ color: "#d32f2f" }}>Delete</Text>
+                                  </Pressable>
+                                </View>
+                              </Card>
+                            ))}
+                          </div>
+                        )
+                      )}
+
+                      {/* Events */}
+                      {contentTab === "events" && (
+                        events.length === 0 ? (
+                          <View className="items-center py-10">
+                            <Ionicons name="calendar-outline" size={24} color="#BDBDBD" />
+                            <Text className="text-sm text-muted-foreground mt-2">No events yet</Text>
+                          </View>
+                        ) : (
+                          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12 }}>
+                            {events.map((item) => (
+                              <Card key={item.id} className="overflow-hidden">
+                                <Pressable onPress={() => router.push(`/event/${item.id}`)}>
+                                  {item.image_url ? (
+                                    <Image source={{ uri: API.mediaUrl(item.image_url) }} style={{ width: "100%" as any, height: 120 }} resizeMode="cover" />
+                                  ) : (
+                                    <View className="w-full items-center justify-center bg-muted" style={{ height: 120 }}>
+                                      <Ionicons name="calendar-outline" size={24} color="#BDBDBD" />
+                                    </View>
+                                  )}
+                                  <CardContent className="p-3 gap-1">
+                                    <Text className="text-sm font-semibold text-foreground" numberOfLines={1}>{item.title}</Text>
+                                    <Text className="text-xs text-muted-foreground">{fmtDate(item.starts_at)}</Text>
+                                    <Text className="text-sm font-bold" style={{ color: item.is_free ? "#2e7d32" : "#8C0B42" }}>
+                                      {item.is_free ? "Free" : item.ticket_price != null ? `$${item.ticket_price}` : "Paid"}
+                                    </Text>
+                                  </CardContent>
+                                </Pressable>
+                                <View className="px-3 pb-2">
+                                  <Pressable className="flex-row items-center gap-1 self-end p-1 rounded hover:bg-muted" onPress={() => deleteEvent(item.id)}>
+                                    <Ionicons name="trash-outline" size={13} color="#d32f2f" />
+                                    <Text className="text-xs" style={{ color: "#d32f2f" }}>Delete</Text>
+                                  </Pressable>
+                                </View>
+                              </Card>
+                            ))}
+                          </div>
+                        )
+                      )}
+                    </CardContent>
+                  </Card>
+                </View>
+              </View>
+
+              {/* ── Reviews & Ratings — full width row ── */}
+              <View className="px-4 pb-8">
+                <Card>
+                  <CardHeader>
+                    <View className="flex-row items-center justify-between">
+                      <View className="flex-row items-center gap-2">
+                        <Text className="text-base font-bold text-foreground">Reviews & Ratings</Text>
+                        {profile && profile.rating_count > 0 && (
+                          <View className="flex-row items-center gap-1 px-2 py-0.5 rounded-full" style={{ backgroundColor: "#FDF2F6" }}>
+                            <Ionicons name="star" size={12} color="#8C0B42" />
+                            <Text className="text-xs font-semibold" style={{ color: "#8C0B42" }}>
+                              {profile.rating_avg.toFixed(1)} ({profile.rating_count})
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                    </View>
+                  </CardHeader>
+                  <CardContent>
+                    {(!profile || profile.rating_count === 0) ? (
+                      <View className="items-center py-10">
+                        <View className="flex-row gap-1 mb-3">
+                          {[1, 2, 3, 4, 5].map((i) => (
+                            <Ionicons key={i} name="star-outline" size={24} color="#E0E0E0" />
+                          ))}
+                        </View>
+                        <Text className="text-sm font-medium text-muted-foreground">No reviews yet</Text>
+                        <Text className="text-xs text-muted-foreground mt-1 text-center" style={{ maxWidth: 320 }}>
+                          When buyers leave reviews on your listings, services, or events, they'll show up here with a star rating and comment.
+                        </Text>
+                      </View>
+                    ) : (
+                      <View className="gap-4">
+                        {/* Rating summary bar */}
+                        <View className="flex-row items-center gap-6 pb-4 border-b border-border">
+                          <View className="items-center">
+                            <Text className="text-4xl font-bold text-foreground">{profile.rating_avg.toFixed(1)}</Text>
+                            <View className="flex-row gap-0.5 mt-1">
+                              {[1, 2, 3, 4, 5].map((i) => (
+                                <Ionicons
+                                  key={i}
+                                  name={i <= Math.round(profile.rating_avg) ? "star" : "star-outline"}
+                                  size={14}
+                                  color={i <= Math.round(profile.rating_avg) ? "#8C0B42" : "#E0E0E0"}
+                                />
+                              ))}
+                            </View>
+                            <Text className="text-xs text-muted-foreground mt-1">{profile.rating_count} reviews</Text>
+                          </View>
+                          {/* Rating distribution bars */}
+                          <View className="flex-1 gap-1.5">
+                            {[5, 4, 3, 2, 1].map((star) => (
+                              <View key={star} className="flex-row items-center gap-2">
+                                <Text className="text-xs text-muted-foreground w-3">{star}</Text>
+                                <Ionicons name="star" size={10} color="#8C0B42" />
+                                <View className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                                  <View className="h-2 rounded-full" style={{ width: "0%", backgroundColor: "#8C0B42" }} />
+                                </View>
+                              </View>
+                            ))}
+                          </View>
+                        </View>
+                        <Text className="text-xs text-muted-foreground text-center">Individual reviews will appear here</Text>
+                      </View>
+                    )}
+                  </CardContent>
+                </Card>
+              </View>
+          </View>
         </View>
       </ScrollView>
 
-      {/* Edit Profile Dialog */}
+      {/* ── Edit Profile Dialog ── */}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>
               <Text>Edit Profile</Text>
             </DialogTitle>
           </DialogHeader>
-
           <View className="gap-4">
             <View className="gap-1.5">
               <Text className="text-sm font-medium text-foreground">Name</Text>
@@ -421,28 +521,17 @@ export default function ProfileScreen() {
               />
             </View>
           </View>
-
           <DialogFooter>
             <Button variant="outline" onPress={() => setEditOpen(false)}>
               <Text>Cancel</Text>
             </Button>
             <Button onPress={handleEditSave} disabled={saving}>
-              <Text>{saving ? "Saving..." : "Save"}</Text>
+              <Text>{saving ? "Saving..." : "Save Changes"}</Text>
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </SafeAreaView>
-  );
-}
-
-function EmptyState({ icon, label }: { icon: keyof typeof Ionicons.glyphMap; label: string }) {
-  return (
-    <View className="items-center py-12">
-      <View className="w-14 h-14 rounded-full bg-muted items-center justify-center mb-3">
-        <Ionicons name={icon} size={24} color="#BDBDBD" />
-      </View>
-      <Text className="text-sm text-muted-foreground">{label}</Text>
     </View>
   );
 }
+
