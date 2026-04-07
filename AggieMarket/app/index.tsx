@@ -156,10 +156,6 @@ export default function LandingScreenWeb() {
                     className="flex-row items-center gap-1"
                     onPress={() => router.push("/register")}
                   >
-                    <Text className="text-sm font-semibold text-foreground">
-                      Learn more
-                    </Text>
-                    <Ionicons name="arrow-forward" size={14} color="#212121" />
                   </Pressable>
                 </CardContent>
               </Card>
