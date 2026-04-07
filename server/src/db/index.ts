@@ -136,5 +136,26 @@ db.run(`
   );
 `);
 
+db.run(`
+-- FTS5 virtual table for listings
+CREATE VIRTUAL TABLE IF NOT EXISTS listings_fts USING fts5(
+  id, title, description, category,
+  content='listings', content_rowid='rowid'
+);
+
+-- FTS5 virtual table for services
+CREATE VIRTUAL TABLE IF NOT EXISTS services_fts USING fts5(
+  id, title, description, category,
+  content='services', content_rowid='rowid'
+);
+
+-- FTS5 virtual table for events
+CREATE VIRTUAL TABLE IF NOT EXISTS events_fts USING fts5(
+  id, title, description, category, location,
+  content='events', content_rowid='rowid'
+);
+`);
+
+
 
 export default db;
