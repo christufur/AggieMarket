@@ -15,8 +15,11 @@ const servicesRoutes = new Elysia()
         if (!payload) return { message: "Invalid token", status: 401 };
 
         const services = db.query(
-            `SELECT s.*, (SELECT s3_url FROM service_images WHERE service_id = s.id ORDER BY sort_order ASC LIMIT 1) AS image_url
-             FROM services s WHERE s.status = 'active' ORDER BY s.created_at DESC`
+            `SELECT s.*, u.name AS provider_name,
+                    (SELECT s3_url FROM service_images WHERE service_id = s.id ORDER BY sort_order ASC LIMIT 1) AS image_url
+             FROM services s
+             LEFT JOIN users u ON u.id = s.provider_id
+             WHERE s.status = 'active' ORDER BY s.created_at DESC`
         ).all();
         return { services, status: 200 };
     })
@@ -53,7 +56,11 @@ const servicesRoutes = new Elysia()
         const payload = await jwt.verify(token) as { id: number; email: string } | false;
         if (!payload) return { message: "Invalid token", status: 401 };
 
-        const service = db.query("SELECT * FROM services WHERE id = ? AND status != 'deleted'").get(params.id);
+        const service = db.query(
+            `SELECT s.*, u.name AS provider_name
+             FROM services s LEFT JOIN users u ON u.id = s.provider_id
+             WHERE s.id = ? AND s.status != 'deleted'`
+        ).get(params.id);
         if (!service) return { message: "Service not found", status: 404 };
 
         db.run("UPDATE services SET view_count = view_count + 1 WHERE id = ?", [params.id]);

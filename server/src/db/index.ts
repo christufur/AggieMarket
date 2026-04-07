@@ -1,6 +1,7 @@
 import {Database} from "bun:sqlite";
 
-const db = new Database("db.sqlite");
+const isTest = process.env.NODE_ENV === "test";
+const db = new Database(isTest ? ":memory:" : "db.sqlite");
 
 db.run("PRAGMA journal_mode=WAL;");
 
@@ -19,6 +20,13 @@ db.run(`
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 `);
+
+// Add cover_url if it doesn't exist (migration for existing DBs)
+try {
+  db.run(`ALTER TABLE users ADD COLUMN cover_url TEXT`);
+} catch {
+  // column already exists
+}
 
 db.run(`
   CREATE TABLE IF NOT EXISTS email_verifications (

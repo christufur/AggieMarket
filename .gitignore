@@ -1,0 +1,64 @@
+# dependencies
+node_modules/
+bun.lock
+package.json
+
+# macOS
+.DS_Store
+**/.DS_Store
+
+# env
+.env
+.env.*
+!.env.example
+
+# database
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+
+# uploads (user-generated)
+server/uploads/
+
+# screenshots
+*.png
+*.jpg
+*.jpeg
+*.gif
+
+# wireframes
+wireframes.html
+
+# markdown files
+*.md
+
+# SLDS/icons (large vendored files)
+**/public/icons/
+**/public/slds.css
+
+# linter/formatter configs
+eslint.config.js
+prettier.config.js
+.eslintcache
+.prettierrc*
+.prettierignore
+
+# build artifacts
+dist/
+web-build/
+build/
+.expo/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# typescript
+*.tsbuildinfo
