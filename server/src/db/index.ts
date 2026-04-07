@@ -164,6 +164,46 @@ CREATE VIRTUAL TABLE IF NOT EXISTS events_fts USING fts5(
 );
 `);
 
+// Conversation and Messaging Tables
+db.run(`
+  -- Conversations table: Represents a chat thread between a buyer and seller
+    CREATE TABLE IF NOT EXISTS conversations (
+    id TEXT PRIMARY KEY,
+    listing_id TEXT,
+    service_id TEXT,
+    event_id TEXT,
+    buyer_id INTEGER NOT NULL,
+    seller_id INTEGER NOT NULL,
+    last_message_at DATETIME,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (listing_id) REFERENCES listings (id) ON DELETE SET NULL,
+    FOREIGN KEY (buyer_id) REFERENCES users (id) ON DELETE CASCADE,
+    FOREIGN KEY (seller_id) REFERENCES users (id) ON DELETE CASCADE
+  );
 
+  -- Messages table: Stores the individual chat entries
+  CREATE TABLE IF NOT EXISTS messages (
+    id TEXT PRIMARY KEY,
+    conversation_id TEXT NOT NULL,
+    sender_id INTEGER NOT NULL,
+    content TEXT NOT NULL,
+    read_at DATETIME,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (conversation_id) REFERENCES conversations (id) ON DELETE CASCADE,
+    FOREIGN KEY (sender_id) REFERENCES users (id) ON DELETE CASCADE
+  );
+`);
 
+// Indexes for performance
+db.run(`
+  -- Speeds up loading the "Messages" inbox for a specific user
+  CREATE INDEX IF NOT EXISTS idx_conversations_buyer ON conversations (buyer_id);
+  CREATE INDEX IF NOT EXISTS idx_conversations_seller ON conversations (seller_id);
+
+  -- Speeds up loading the message history within a specific chat
+  CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages (conversation_id, created_at DESC);
+  CREATE INDEX IF NOT EXISTS idx_messages_sender ON messages (sender_id);
+  `);
+
+  
 export default db;
