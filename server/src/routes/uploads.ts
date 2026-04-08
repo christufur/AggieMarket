@@ -16,7 +16,7 @@ const EXT_MAP: Record<string, string> = {
 await mkdir(UPLOADS_DIR, { recursive: true });
 
 const uploadsRoutes = new Elysia()
-  .use(jwt({ name: "jwt", secret: process.env.JWT_SECRET || "secret" }))
+  .use(jwt({ name: "jwt", secret: process.env.JWT_SECRET! }))
 
   // UPLOAD image
   .post(

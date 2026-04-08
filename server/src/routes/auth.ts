@@ -10,7 +10,7 @@ const isValidEmail = (email: string) => {
 const generateToken = () => Math.floor(100000 + Math.random() * 900000).toString();
 
 const authRoutes = new Elysia()
-    .use(jwt({ name: "jwt", secret: process.env.JWT_SECRET || "secret" }))
+    .use(jwt({ name: "jwt", secret: process.env.JWT_SECRET! }))
 
     .post("/auth/register", async ({ body }) => {
         const { name, email, password } = body as { name: string, email: string, password: string }

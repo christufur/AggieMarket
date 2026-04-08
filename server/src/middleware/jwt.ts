@@ -4,7 +4,7 @@ import jwt from "@elysiajs/jwt";
 const jwtMiddleware = new Elysia()
     .use(jwt({
         name: "jwt",
-        secret: process.env.JWT_SECRET || "secret"
+        secret: process.env.JWT_SECRET!
     }))
 
 export default jwtMiddleware;
