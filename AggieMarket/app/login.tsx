@@ -16,9 +16,32 @@ export default function LoginScreenWeb() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [needsVerification, setNeedsVerification] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendMessage, setResendMessage] = useState("");
+
+  const handleResendCode = async () => {
+    setResendMessage("");
+    setResendLoading(true);
+    try {
+      const res = await fetch(API.resendVerification, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json();
+      setResendMessage(data.message || "Code sent. Check your NMSU email.");
+    } catch {
+      setResendMessage("Could not connect to server.");
+    } finally {
+      setResendLoading(false);
+    }
+  };
 
   const handleLogin = async () => {
     setError("");
+    setNeedsVerification(false);
+    setResendMessage("");
     if (!email || !password) {
       setError("Please fill in all fields.");
       return;
@@ -39,6 +62,9 @@ export default function LoginScreenWeb() {
         });
         const meData = await meRes.json();
         await login(data.token, meData.user);
+      } else if (data.status === 403) {
+        setNeedsVerification(true);
+        setError(data.message || "Please verify your email before logging in.");
       } else {
         setError(data.message || "Login failed.");
       }
@@ -84,9 +110,16 @@ export default function LoginScreenWeb() {
           </View>
 
           <View className="gap-1.5">
-            <Text className="text-sm font-semibold text-foreground">
-              Password
-            </Text>
+            <View className="flex-row items-center justify-between">
+              <Text className="text-sm font-semibold text-foreground">
+                Password
+              </Text>
+              <Pressable onPress={() => router.push("/forgot-password")}>
+                <Text className="text-sm text-muted-foreground">
+                  Forgot password?
+                </Text>
+              </Pressable>
+            </View>
             <Input
               value={password}
               onChangeText={setPassword}
@@ -101,6 +134,19 @@ export default function LoginScreenWeb() {
             <Text className="text-sm font-medium text-destructive">
               {error}
             </Text>
+          ) : null}
+
+          {needsVerification ? (
+            <View className="gap-1">
+              {resendMessage ? (
+                <Text className="text-sm text-muted-foreground">{resendMessage}</Text>
+              ) : null}
+              <Pressable onPress={handleResendCode} disabled={resendLoading}>
+                <Text className="text-sm font-semibold text-foreground">
+                  {resendLoading ? "Sending..." : "Resend verification code →"}
+                </Text>
+              </Pressable>
+            </View>
           ) : null}
 
           <Button onPress={handleLogin} disabled={loading} className="mt-1">

@@ -24,7 +24,7 @@ function RootNavigator() {
   useEffect(() => {
     if (isLoading) return;
 
-    const inAuthGroup = ["login", "register", "verify-email", "index"].includes(
+    const inAuthGroup = ["login", "register", "verify-email", "forgot-password", "index"].includes(
       segments[0] as string
     );
 

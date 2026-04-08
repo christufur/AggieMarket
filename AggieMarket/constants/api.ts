@@ -1,7 +1,9 @@
 import { Platform } from "react-native";
 
 const BASE = Platform.OS === "web"
-  ? (process.env.EXPO_PUBLIC_API_URL_WEB ?? "https://aggiemarket.xyz")
+  ? (__DEV__
+      ? (process.env.EXPO_PUBLIC_API_URL_WEB ?? "http://localhost:3000")
+      : "https://aggiemarket.xyz")
   : Platform.OS === "android"
   ? (process.env.EXPO_PUBLIC_API_URL_ANDROID ?? "http://10.0.2.2:3000")
   : (process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000");
@@ -12,7 +14,10 @@ const WS_BASE = BASE.replace(/^http/, "ws");
 export const API = {
   register: `${BASE}/auth/register`,
   verifyEmail: `${BASE}/auth/verify-email`,
+  resendVerification: `${BASE}/auth/resend-verification`,
   login: `${BASE}/auth/login`,
+  forgotPassword: `${BASE}/auth/forgot-password`,
+  resetPassword: `${BASE}/auth/reset-password`,
   me: `${BASE}/auth/me`,
   listings: `${BASE}/listings`,
   listingsPopular: (limit = 10) => `${BASE}/listings/popular?limit=${limit}`,
