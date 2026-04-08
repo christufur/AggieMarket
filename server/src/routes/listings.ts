@@ -1,9 +1,10 @@
 import { Elysia } from "elysia";
 import { jwt } from "@elysiajs/jwt";
 import db from "../db";
+import crypto from "crypto";
 
 const listingsRoutes = new Elysia()
-    .use(jwt({ name: "jwt", secret: process.env.JWT_SECRET || "secret" }))
+    .use(jwt({ name: "jwt", secret: process.env.JWT_SECRET! }))
 
     // CREATE listing
     .post("/listings", async ({ body, headers, jwt }) => {
@@ -46,7 +47,13 @@ const listingsRoutes = new Elysia()
             minPrice?: string;
             maxPrice?: string;
             q?: string;
+            page?: string;
+            limit?: string;
         };
+
+        const page = Math.max(1, parseInt(query.page as string) || 1);
+        const limit = Math.min(50, Math.max(1, parseInt(query.limit as string) || 20));
+        const offset = (page - 1) * limit;
 
         const conditions: string[] = ["l.status = 'active'"];
         const params: any[] = [];
@@ -61,15 +68,20 @@ const listingsRoutes = new Elysia()
         }
 
         const where = conditions.join(" AND ");
+
+        const total = (db.query(
+            `SELECT COUNT(*) as count FROM listings l WHERE ${where}`
+        ).get(...params) as { count: number }).count;
+
         const listings = db.query(
             `SELECT l.*, u.name AS seller_name,
                     (SELECT s3_url FROM listing_images WHERE listing_id = l.id ORDER BY sort_order ASC LIMIT 1) AS image_url
              FROM listings l
              LEFT JOIN users u ON u.id = l.seller_id
-             WHERE ${where} ORDER BY l.created_at DESC`
-        ).all(...params);
+             WHERE ${where} ORDER BY l.created_at DESC LIMIT ? OFFSET ?`
+        ).all(...params, limit, offset);
 
-        return { listings, status: 200 };
+        return { listings, total, page, limit, status: 200 };
     })
 
     // GET single listing

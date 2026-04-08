@@ -16,7 +16,7 @@ type ConversationRow = {
 };
 
 const conversationsRoutes = new Elysia()
-    .use(jwt({ name: "jwt", secret: process.env.JWT_SECRET || "secret" }))
+    .use(jwt({ name: "jwt", secret: process.env.JWT_SECRET! }))
 
     // GET /conversations — list all conversations for the authenticated user
     // 1. Auth

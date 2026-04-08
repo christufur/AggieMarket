@@ -3,7 +3,7 @@ import { jwt } from "@elysiajs/jwt";
 import db from "../db";
 
 const usersRoutes = new Elysia()
-  .use(jwt({ name: "jwt", secret: process.env.JWT_SECRET || "secret" }))
+  .use(jwt({ name: "jwt", secret: process.env.JWT_SECRET! }))
 
   // GET public profile
   .get("/users/:id", ({ params }) => {

@@ -4,7 +4,7 @@ import db from "../db";
 import { addConnection, removeConnection, sendToUser } from "../utils/connections";
 
 const wsRoutes = new Elysia()
-    .use(jwt({ name: "jwt", secret: process.env.JWT_SECRET || "secret" }))
+    .use(jwt({ name: "jwt", secret: process.env.JWT_SECRET! }))
     .ws("/ws/chat", {
         async open(ws) {
             // Auth via query param — browser WebSocket API can't set headers

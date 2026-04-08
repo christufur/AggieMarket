@@ -1,8 +1,9 @@
 import { useEffect, useState, useRef, useCallback } from "react";
+import { colors } from "@/theme/colors";
 import {
   View, Pressable, ScrollView, useWindowDimensions, ActivityIndicator,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { Text } from "@/components/ui/text";
 import { Input } from "@/components/ui/input";
@@ -41,14 +42,21 @@ type Message = {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
+/** Parse SQLite datetime — appends Z if no timezone marker so JS treats as UTC */
+function parseDate(raw: string): Date {
+  const s = raw.includes("T") || raw.includes("Z") || raw.includes("+") ? raw : raw + "Z";
+  return new Date(s);
+}
+
 function timeAgo(iso: string | null): string {
   if (!iso) return "";
-  const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  const diff = Math.floor((Date.now() - parseDate(iso).getTime()) / 1000);
+  if (diff < 0) return "just now";
   if (diff < 60) return "just now";
   if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
   if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
   if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
-  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  return parseDate(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
 function getInitials(name: string): string {
@@ -56,7 +64,7 @@ function getInitials(name: string): string {
 }
 
 function formatMessageTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+  return parseDate(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
 }
 
 // ─── Avatar ──────────────────────────────────────────────────────────────────
@@ -66,11 +74,11 @@ function Avatar({ name, size = 40 }: { name: string; size?: number }) {
     <View
       style={{
         width: size, height: size, borderRadius: size / 2,
-        backgroundColor: "#FDF2F6", borderWidth: 1.5, borderColor: "#F9C9DB",
+        backgroundColor: colors.primaryLight, borderWidth: 1.5, borderColor: colors.primaryBorder,
         alignItems: "center", justifyContent: "center", flexShrink: 0,
       }}
     >
-      <Text style={{ fontSize: size * 0.36, fontWeight: "700", color: "#8C0B42" }}>
+      <Text style={{ fontSize: size * 0.36, fontWeight: "700", color: colors.primary }}>
         {getInitials(name)}
       </Text>
     </View>
@@ -96,14 +104,14 @@ function ConversationRow({
         flexDirection: "row", alignItems: "center",
         paddingHorizontal: 12, paddingVertical: 11, gap: 10,
         backgroundColor: selected
-          ? "#FDF2F6"
+          ? colors.primaryLight
           : hovered
           ? "#fdf6f9"
           : hasUnread
           ? "#fffafc"
           : "transparent",
         borderRightWidth: selected ? 2 : 0,
-        borderRightColor: "#8C0B42",
+        borderRightColor: colors.primary,
         transitionDuration: "120ms",
         transitionProperty: "background-color",
       } as any}
@@ -114,7 +122,7 @@ function ConversationRow({
           <View style={{
             position: "absolute", bottom: 0, right: 0,
             width: 10, height: 10, borderRadius: 5,
-            backgroundColor: "#8C0B42", borderWidth: 2, borderColor: "#fff",
+            backgroundColor: colors.primary, borderWidth: 2, borderColor: "#fff",
           }} />
         )}
       </View>
@@ -139,7 +147,7 @@ function ConversationRow({
           </Text>
           {hasUnread && (
             <View style={{
-              backgroundColor: "#8C0B42", borderRadius: 100,
+              backgroundColor: colors.primary, borderRadius: 100,
               minWidth: 18, height: 18, paddingHorizontal: 4,
               alignItems: "center", justifyContent: "center", flexShrink: 0,
             }}>
@@ -161,9 +169,9 @@ function NoConversationSelected() {
     <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: 14, padding: 40 }}>
       <View style={{
         width: 64, height: 64, borderRadius: 32,
-        backgroundColor: "#FDF2F6", alignItems: "center", justifyContent: "center",
+        backgroundColor: colors.primaryLight, alignItems: "center", justifyContent: "center",
       }}>
-        <Ionicons name="chatbubbles-outline" size={28} color="#8C0B42" />
+        <Ionicons name="chatbubbles-outline" size={28} color={colors.primary} />
       </View>
       <Text style={{ fontSize: 16, fontWeight: "700", color: "#111" }}>
         Select a conversation
@@ -185,7 +193,7 @@ function MessageBubble({ msg, isMine }: { msg: Message; isMine: boolean }) {
       marginBottom: 8,
     }}>
       <View style={{
-        backgroundColor: isMine ? "#8C0B42" : "#fff",
+        backgroundColor: isMine ? colors.primary : "#fff",
         borderRadius: 16,
         borderBottomRightRadius: isMine ? 4 : 16,
         borderBottomLeftRadius: isMine ? 16 : 4,
@@ -208,6 +216,14 @@ function MessageBubble({ msg, isMine }: { msg: Message; isMine: boolean }) {
       }}>
         {formatMessageTime(msg.created_at)}
       </Text>
+      {isMine && (
+        <Text style={{
+          fontSize: 9, color: msg.read_at ? colors.primary : "#ccc",
+          alignSelf: "flex-end", paddingHorizontal: 4,
+        }}>
+          {msg.read_at ? "\u2713\u2713 Read" : "\u2713 Sent"}
+        </Text>
+      )}
     </View>
   );
 }
@@ -221,6 +237,7 @@ function ChatPanel({ conversation, token, userId }: {
   const [loading, setLoading] = useState(true);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState("");
   const [typing, setTyping] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
   const { subscribe, send } = useWebSocket();
@@ -295,7 +312,10 @@ function ChatPanel({ conversation, token, userId }: {
       if (data.message) {
         setMessages((prev) => [...prev, data.message]);
       }
-    } catch { /* ignore */ }
+    } catch {
+      setSendError("Failed to send");
+      setTimeout(() => setSendError(""), 3000);
+    }
     finally { setSending(false); }
   };
 
@@ -319,9 +339,18 @@ function ChatPanel({ conversation, token, userId }: {
             {conversation.partner_name}
           </Text>
           {typing && (
-            <Text style={{ fontSize: 11, color: "#8C0B42", fontWeight: "500" }}>
-              typing...
-            </Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+              <Text style={{ fontSize: 11, color: colors.primary, fontWeight: "500" }}>typing</Text>
+              <View style={{ flexDirection: "row", gap: 2 }}>
+                {[0, 1, 2].map((i) => (
+                  <View key={i} style={{
+                    width: 4, height: 4, borderRadius: 2, backgroundColor: colors.primary,
+                    opacity: 0.4,
+                    animation: `pulse 1.4s ease-in-out ${i * 0.2}s infinite`,
+                  } as any} />
+                ))}
+              </View>
+            </View>
           )}
         </View>
       </View>
@@ -329,7 +358,7 @@ function ChatPanel({ conversation, token, userId }: {
       {/* Messages */}
       {loading ? (
         <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-          <ActivityIndicator color="#8C0B42" />
+          <ActivityIndicator color={colors.primary} />
         </View>
       ) : (
         <ScrollView
@@ -351,6 +380,13 @@ function ChatPanel({ conversation, token, userId }: {
         </ScrollView>
       )}
 
+      {/* Send error */}
+      {sendError ? (
+        <View style={{ paddingHorizontal: 16, paddingVertical: 6, backgroundColor: colors.errorLight }}>
+          <Text style={{ fontSize: 12, color: colors.error, fontWeight: "500" }}>{sendError}</Text>
+        </View>
+      ) : null}
+
       {/* Input bar */}
       <View style={{
         flexDirection: "row", alignItems: "center", gap: 10,
@@ -371,7 +407,7 @@ function ChatPanel({ conversation, token, userId }: {
           onPress={sendMessage}
           style={{
             width: 40, height: 40, borderRadius: 20,
-            backgroundColor: input.trim() ? "#8C0B42" : "#E0E0E0",
+            backgroundColor: input.trim() ? colors.primary : colors.border,
             alignItems: "center", justifyContent: "center",
           }}
           disabled={!input.trim() || sending}
@@ -387,13 +423,14 @@ function ChatPanel({ conversation, token, userId }: {
 
 export default function InboxScreen() {
   const router = useRouter();
+  const { conversation: conversationParam } = useLocalSearchParams<{ conversation?: string }>();
   const { user, token } = useAuth();
   const { width } = useWindowDimensions();
   const { unreadCount, subscribe } = useWebSocket();
 
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(conversationParam ?? null);
   const [query, setQuery] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
 
@@ -443,72 +480,25 @@ export default function InboxScreen() {
     <View className="flex-1 bg-background" style={{ height: "100vh" as any }}>
 
       {/* ── Navbar ── */}
-      <View
-        className="bg-card border-b border-border h-[60px] justify-center z-[100]"
-        style={{ position: "sticky" as any, top: 0, paddingHorizontal: isMobile ? 12 : 24 }}
-      >
-        <View className="flex-row items-center w-full gap-3">
-          <Pressable className="flex-row items-center gap-2 shrink-0" onPress={() => router.push("/home")}>
-            <View className="bg-primary px-[7px] py-[3px] rounded">
-              <Text className="text-primary-foreground text-[11px] font-extrabold tracking-wide">AM</Text>
-            </View>
-            {!isMobile && (
-              <Text className="text-base font-bold text-foreground tracking-tight font-display">
-                Aggie Market
-              </Text>
-            )}
-          </Pressable>
-
-          <View
-            className={`flex-1 flex-row items-center bg-background border-[1.5px] rounded-lg px-3 h-[38px] gap-2 ${
-              searchFocused ? "border-foreground" : "border-border"
-            }`}
-          >
-            <Ionicons name="search-outline" size={16} color="#757575" />
-            <Input
-              className="flex-1 text-[13px] border-0 h-auto p-0"
-              placeholder="Search conversations..."
-              value={query}
-              onChangeText={setQuery}
-              onFocus={() => setSearchFocused(true)}
-              onBlur={() => setSearchFocused(false)}
-              style={{ outlineStyle: "none" } as any}
-            />
-            {query.length > 0 && (
-              <Pressable onPress={() => setQuery("")}>
-                <Ionicons name="close-circle" size={16} color="#bbb" />
-              </Pressable>
-            )}
-          </View>
-
-          <View className="flex-row items-center gap-2 shrink-0">
-            <View className="w-9 h-9 border-[1.5px] rounded-lg items-center justify-center" style={{ borderColor: "#8C0B42", backgroundColor: "#FDF2F6", position: "relative" as any }}>
-              <Ionicons name="chatbubble-outline" size={16} color="#8C0B42" />
-              {totalUnread > 0 && (
-                <View style={{
-                  position: "absolute", top: -4, right: -4,
-                  backgroundColor: "#8C0B42", borderRadius: 100,
-                  minWidth: 16, height: 16, paddingHorizontal: 3,
-                  alignItems: "center", justifyContent: "center",
-                  borderWidth: 1.5, borderColor: "#fff",
-                }}>
-                  <Text style={{ color: "#fff", fontSize: 9, fontWeight: "700" }}>
-                    {totalUnread}
-                  </Text>
-                </View>
-              )}
-            </View>
-            <Pressable
-              className="w-9 h-9 border-[1.5px] border-border rounded-lg items-center justify-center"
-              onPress={() => router.push("/profile")}
-            >
-              <Ionicons name="person-outline" size={16} color="#757575" />
+      <View className="bg-card border-b border-border px-6 py-3">
+        <View className="flex-row items-center justify-between" style={{ maxWidth: 1100, marginHorizontal: "auto", width: "100%" }}>
+          <View className="flex-row items-center gap-3">
+            <Pressable onPress={() => router.push("/home")} className="flex-row items-center gap-1.5">
+              <View className="bg-primary rounded px-1.5 py-0.5">
+                <Text className="text-xs font-bold text-primary-foreground">AM</Text>
+              </View>
+              <Text className="text-sm font-semibold text-foreground">Home</Text>
             </Pressable>
-            <Button size="sm" onPress={() => router.push("/home")}>
-              <Text className="text-primary-foreground text-[13px] font-bold">
-                {isMobile ? "+" : "+ New Post"}
-              </Text>
-            </Button>
+            <Ionicons name="chevron-forward" size={12} color={colors.mid} />
+            <Text className="text-sm text-muted-foreground">Messages</Text>
+          </View>
+          <View className="flex-row items-center gap-2">
+            <Pressable className="w-9 h-9 border-[1.5px] border-border rounded-lg items-center justify-center" onPress={() => router.push("/saved")}>
+              <Ionicons name="heart-outline" size={16} color={colors.dark} />
+            </Pressable>
+            <Pressable className="w-9 h-9 border-[1.5px] border-border rounded-lg items-center justify-center" onPress={() => router.push("/profile")}>
+              <Ionicons name="person-outline" size={16} color={colors.dark} />
+            </Pressable>
           </View>
         </View>
       </View>
@@ -523,12 +513,12 @@ export default function InboxScreen() {
           borderRightColor: "#e5e7eb",
           flexDirection: "column",
         }}>
-          <View style={{ paddingHorizontal: 14, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: "#f0f0f0" }}>
+          <View style={{ paddingHorizontal: 14, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: "#f0f0f0", gap: 10 }}>
             <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
               <Text style={{ fontSize: 15, fontWeight: "700", color: "#111" }}>Messages</Text>
               {totalUnread > 0 && (
                 <View style={{
-                  backgroundColor: "#8C0B42", borderRadius: 100,
+                  backgroundColor: colors.primary, borderRadius: 100,
                   paddingHorizontal: 8, paddingVertical: 2,
                 }}>
                   <Text style={{ color: "#fff", fontSize: 11, fontWeight: "700" }}>
@@ -537,12 +527,33 @@ export default function InboxScreen() {
                 </View>
               )}
             </View>
+            <View
+              className={`flex-row items-center bg-background border-[1.5px] rounded-lg px-3 h-[34px] gap-2 ${
+                searchFocused ? "border-foreground" : "border-border"
+              }`}
+            >
+              <Ionicons name="search-outline" size={14} color={colors.dark} />
+              <Input
+                className="flex-1 text-[12px] border-0 h-auto p-0"
+                placeholder="Search conversations..."
+                value={query}
+                onChangeText={setQuery}
+                onFocus={() => setSearchFocused(true)}
+                onBlur={() => setSearchFocused(false)}
+                style={{ outlineStyle: "none" } as any}
+              />
+              {query.length > 0 && (
+                <Pressable onPress={() => setQuery("")}>
+                  <Ionicons name="close-circle" size={14} color="#bbb" />
+                </Pressable>
+              )}
+            </View>
           </View>
 
           <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
             {loading ? (
               <View style={{ alignItems: "center", paddingVertical: 48 }}>
-                <ActivityIndicator color="#8C0B42" />
+                <ActivityIndicator color={colors.primary} />
               </View>
             ) : filtered.length === 0 ? (
               <View style={{ alignItems: "center", paddingVertical: 48, paddingHorizontal: 20, gap: 8 }}>

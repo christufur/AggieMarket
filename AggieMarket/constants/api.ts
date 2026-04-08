@@ -23,6 +23,8 @@ export const API = {
   events: `${BASE}/events`,
   event: (id: string) => `${BASE}/events/${id}`,
   eventImages: (id: string) => `${BASE}/events/${id}/images`,
+  eventRsvp: (id: string) => `${BASE}/events/${id}/rsvp`,
+  eventAttendees: (id: string) => `${BASE}/events/${id}/attendees`,
   upload: `${BASE}/upload`,
   mediaUrl: (path: string) => `${BASE}${path}`,
   user: (id: number) => `${BASE}/users/${id}`,
@@ -35,6 +37,9 @@ export const API = {
   conversationMessages: (id: string) => `${BASE}/conversations/${id}/messages`,
   conversationUnreadCount: `${BASE}/conversations/unread-count`,
   conversationRead: (id: string) => `${BASE}/conversations/${id}/read`,
+  saved: `${BASE}/saved`,
+  savedCheck: `${BASE}/saved/check`,
+  savedItem: (id: number) => `${BASE}/saved/${id}`,
   wsChat: (token: string) =>
     `${WS_BASE}/ws/chat?token=${encodeURIComponent(token)}`,
 };
