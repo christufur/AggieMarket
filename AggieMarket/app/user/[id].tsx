@@ -213,21 +213,31 @@ export default function PublicProfileScreen() {
               </Badge>
             </View>
 
-            <Button className="mt-3" onPress={async () => {
-              if (!token || !id) return;
-              try {
-                const res = await fetch(API.conversations, {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-                  body: JSON.stringify({ seller_id: Number(id) }),
-                });
-                const data = await res.json();
-                if (data.conversation) router.push(`/inbox?conversation=${data.conversation.id}`);
-              } catch {}
-            }}>
-              <Ionicons name="chatbubble-outline" size={16} color={colors.white} />
-              <Text className="ml-2 text-sm font-semibold text-primary-foreground">Message</Text>
-            </Button>
+            <Pressable
+              onPress={async () => {
+                if (!token || !id) return;
+                try {
+                  const res = await fetch(API.conversations, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                    body: JSON.stringify({ seller_id: Number(id) }),
+                  });
+                  const data = await res.json();
+                  if (data.conversation) router.push(`/inbox?conversation=${data.conversation.id}`);
+                } catch {}
+              }}
+              style={{
+                flexDirection: "row", alignItems: "center", gap: 8,
+                marginTop: 14, paddingHorizontal: 20, paddingVertical: 10,
+                borderRadius: 10, borderWidth: 1.5, borderColor: colors.primary,
+                backgroundColor: colors.primaryLight,
+              }}
+            >
+              <Ionicons name="chatbubble-outline" size={15} color={colors.primary} />
+              <Text style={{ fontSize: 13, fontWeight: "600", color: colors.primary }}>
+                Send Message
+              </Text>
+            </Pressable>
           </View>
 
           {/* Two-column layout */}

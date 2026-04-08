@@ -41,10 +41,10 @@ const conversationsRoutes = new Elysia()
                 l.title as listing_title,
                 l.price as listing_price,
                 l.is_free as listing_is_free,
-                (SELECT url FROM listing_images WHERE listing_id = l.id ORDER BY sort_order ASC LIMIT 1) as listing_image,
+                (SELECT s3_url FROM listing_images WHERE listing_id = l.id ORDER BY sort_order ASC LIMIT 1) as listing_image,
                 sv.title as service_title,
                 sv.price as service_price,
-                (SELECT url FROM service_images WHERE service_id = sv.id ORDER BY sort_order ASC LIMIT 1) as service_image,
+                (SELECT s3_url FROM service_images WHERE service_id = sv.id ORDER BY sort_order ASC LIMIT 1) as service_image,
                 ev.title as event_title
             FROM conversations c
             JOIN users u ON CASE WHEN c.buyer_id = ? THEN c.seller_id ELSE c.buyer_id END = u.id

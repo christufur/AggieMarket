@@ -9,6 +9,7 @@ import * as ImagePicker from "expo-image-picker";
 import DatePicker from "react-datepicker";
 import { colors } from "../theme/colors";
 import { useAuth } from "../context/AuthContext";
+import { useWebSocket } from "../context/WebSocketContext";
 import { API } from "../constants/api";
 import { Ionicons } from "@expo/vector-icons";
 import { Text } from "@/components/ui/text";
@@ -748,6 +749,7 @@ export default function HomeWebScreen() {
   const { user, token } = useAuth();
   const { width } = useWindowDimensions();
   const router = useRouter();
+  const { unreadCount } = useWebSocket();
 
   const [listings, setListings] = useState<Listing[]>([]);
   const [services, setServices] = useState<Service[]>([]);
@@ -895,8 +897,21 @@ export default function HomeWebScreen() {
                 <Pressable className="w-9 h-9 border-[1.5px] border-border rounded-lg items-center justify-center" onPress={() => router.push("/saved")}>
                   <Ionicons name="heart-outline" size={16} color={colors.dark} />
                 </Pressable>
-                <Pressable className="w-9 h-9 border-[1.5px] border-border rounded-lg items-center justify-center" onPress={() => router.push("/inbox")}>
+                <Pressable className="w-9 h-9 border-[1.5px] border-border rounded-lg items-center justify-center" onPress={() => router.push("/inbox")} style={{ position: "relative" as any }}>
                   <Ionicons name="chatbubble-outline" size={16} color={colors.dark} />
+                  {unreadCount > 0 && (
+                    <View style={{
+                      position: "absolute", top: -4, right: -4,
+                      backgroundColor: colors.primary, borderRadius: 100,
+                      minWidth: 16, height: 16, paddingHorizontal: 3,
+                      alignItems: "center", justifyContent: "center",
+                      borderWidth: 1.5, borderColor: colors.white,
+                    }}>
+                      <Text style={{ color: colors.white, fontSize: 9, fontWeight: "700" }}>
+                        {unreadCount > 99 ? "99+" : unreadCount}
+                      </Text>
+                    </View>
+                  )}
                 </Pressable>
               </>
             )}

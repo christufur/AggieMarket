@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { colors } from "@/theme/colors";
 import {
-  View, Pressable, ScrollView, useWindowDimensions, ActivityIndicator,
+  View, Pressable, ScrollView, useWindowDimensions, ActivityIndicator, Image,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -28,6 +28,14 @@ type Conversation = {
   last_message_content: string | null;
   last_message_at: string | null;
   unread_count: number;
+  listing_title: string | null;
+  listing_price: number | null;
+  listing_is_free: number | null;
+  listing_image: string | null;
+  service_title: string | null;
+  service_price: number | null;
+  service_image: string | null;
+  event_title: string | null;
 };
 
 type Message = {
@@ -137,6 +145,12 @@ function ConversationRow({
           </Text>
         </View>
 
+        {(item.listing_title || item.service_title || item.event_title) && (
+          <Text numberOfLines={1} style={{ fontSize: 10, color: colors.primary, fontWeight: "500" }}>
+            {item.listing_title || item.service_title || item.event_title}
+          </Text>
+        )}
+
         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 4 }}>
           <Text numberOfLines={1} style={{
             fontSize: 12, flex: 1,
@@ -209,21 +223,23 @@ function MessageBubble({ msg, isMine }: { msg: Message; isMine: boolean }) {
           {msg.content}
         </Text>
       </View>
-      <Text style={{
-        fontSize: 10, color: "#bbb", marginTop: 3,
+      <View style={{
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 6,
+        marginTop: 3,
         alignSelf: isMine ? "flex-end" : "flex-start",
         paddingHorizontal: 4,
       }}>
-        {formatMessageTime(msg.created_at)}
-      </Text>
-      {isMine && (
-        <Text style={{
-          fontSize: 9, color: msg.read_at ? colors.primary : "#ccc",
-          alignSelf: "flex-end", paddingHorizontal: 4,
-        }}>
-          {msg.read_at ? "\u2713\u2713 Read" : "\u2713 Sent"}
+        <Text style={{ fontSize: 10, color: "#bbb" }}>
+          {formatMessageTime(msg.created_at)}
         </Text>
-      )}
+        {isMine && (
+          <Text style={{ fontSize: 9, color: msg.read_at ? colors.primary : "#ccc" }}>
+            {msg.read_at ? "\u2713\u2713 Read" : "\u2713 Sent"}
+          </Text>
+        )}
+      </View>
     </View>
   );
 }
@@ -233,6 +249,7 @@ function MessageBubble({ msg, isMine }: { msg: Message; isMine: boolean }) {
 function ChatPanel({ conversation, token, userId }: {
   conversation: Conversation; token: string; userId: number;
 }) {
+  const router = useRouter();
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
   const [input, setInput] = useState("");
@@ -354,6 +371,62 @@ function ChatPanel({ conversation, token, userId }: {
           )}
         </View>
       </View>
+
+      {/* Item context banner */}
+      {(() => {
+        const itemTitle = conversation.listing_title || conversation.service_title || conversation.event_title;
+        const itemImage = conversation.listing_image || conversation.service_image;
+        const itemPrice = conversation.listing_title
+          ? (conversation.listing_is_free ? "Free" : conversation.listing_price != null ? `$${conversation.listing_price}` : null)
+          : conversation.service_title
+          ? (conversation.service_price != null ? `$${conversation.service_price}` : null)
+          : null;
+        const itemType = conversation.listing_id ? "listing" : conversation.service_id ? "service" : conversation.event_id ? "event" : null;
+        const itemId = conversation.listing_id || conversation.service_id || conversation.event_id;
+
+        if (!itemTitle) return null;
+        return (
+          <Pressable
+            onPress={() => { if (itemType && itemId) router.push(`/${itemType}/${itemId}` as any); }}
+            style={{
+              flexDirection: "row", alignItems: "center", gap: 10,
+              paddingHorizontal: 16, paddingVertical: 8,
+              backgroundColor: colors.primaryLight,
+              borderBottomWidth: 1, borderBottomColor: colors.primaryBorder,
+            }}
+          >
+            {itemImage ? (
+              <Image
+                source={{ uri: itemImage.startsWith("http") ? itemImage : API.mediaUrl(itemImage) }}
+                style={{ width: 36, height: 36, borderRadius: 6 }}
+                resizeMode="cover"
+              />
+            ) : (
+              <View style={{
+                width: 36, height: 36, borderRadius: 6,
+                backgroundColor: colors.primaryBorder, alignItems: "center", justifyContent: "center",
+              }}>
+                <Ionicons
+                  name={itemType === "event" ? "calendar-outline" : itemType === "service" ? "construct-outline" : "pricetag-outline"}
+                  size={16}
+                  color={colors.primary}
+                />
+              </View>
+            )}
+            <View style={{ flex: 1, gap: 1 }}>
+              <Text numberOfLines={1} style={{ fontSize: 12, fontWeight: "600", color: colors.primary }}>
+                {itemTitle}
+              </Text>
+              {itemPrice && (
+                <Text style={{ fontSize: 11, fontWeight: "500", color: colors.dark }}>
+                  {itemPrice}
+                </Text>
+              )}
+            </View>
+            <Ionicons name="chevron-forward" size={14} color={colors.primary} />
+          </Pressable>
+        );
+      })()}
 
       {/* Messages */}
       {loading ? (
