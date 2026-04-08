@@ -37,9 +37,20 @@ const conversationsRoutes = new Elysia()
                 u.name as partner_name,
                 u.avatar_url as partner_avatar,
                 (SELECT content FROM messages WHERE conversation_id = c.id ORDER BY rowid DESC LIMIT 1) as last_message_content,
-                (SELECT COUNT(*) FROM messages WHERE conversation_id = c.id AND sender_id != ? AND read_at IS NULL) as unread_count
+                (SELECT COUNT(*) FROM messages WHERE conversation_id = c.id AND sender_id != ? AND read_at IS NULL) as unread_count,
+                l.title as listing_title,
+                l.price as listing_price,
+                l.is_free as listing_is_free,
+                (SELECT url FROM listing_images WHERE listing_id = l.id ORDER BY sort_order ASC LIMIT 1) as listing_image,
+                sv.title as service_title,
+                sv.price as service_price,
+                (SELECT url FROM service_images WHERE service_id = sv.id ORDER BY sort_order ASC LIMIT 1) as service_image,
+                ev.title as event_title
             FROM conversations c
             JOIN users u ON CASE WHEN c.buyer_id = ? THEN c.seller_id ELSE c.buyer_id END = u.id
+            LEFT JOIN listings l ON l.id = c.listing_id
+            LEFT JOIN services sv ON sv.id = c.service_id
+            LEFT JOIN events ev ON ev.id = c.event_id
             WHERE c.buyer_id = ? OR c.seller_id = ?
             ORDER BY c.last_message_at DESC NULLS LAST
         `)
@@ -68,11 +79,23 @@ const conversationsRoutes = new Elysia()
         };
 
         if (seller_id === userId) return { message: "Cannot message yourself", status: 400 };
-        
-        const existingConversation = db
-            .query("SELECT * FROM conversations WHERE buyer_id = ? AND seller_id = ? AND listing_id IS ? AND service_id IS ? AND event_id IS ?")
-            .get(userId, seller_id, listing_id ?? null, service_id ?? null, event_id ?? null);
-        if (existingConversation) return { conversation: existingConversation, status: 200 };
+
+        // If item context provided, match exact conversation (item-specific)
+        // If no item context (e.g. from profile), find the most recent conversation with this user
+        const hasItemContext = listing_id || service_id || event_id;
+
+        if (hasItemContext) {
+            const existingConversation = db
+                .query("SELECT * FROM conversations WHERE buyer_id = ? AND seller_id = ? AND listing_id IS ? AND service_id IS ? AND event_id IS ?")
+                .get(userId, seller_id, listing_id ?? null, service_id ?? null, event_id ?? null);
+            if (existingConversation) return { conversation: existingConversation, status: 200 };
+        } else {
+            // Find the most recent conversation between these two users (any item or none)
+            const existingConversation = db
+                .query("SELECT * FROM conversations WHERE (buyer_id = ? AND seller_id = ?) OR (buyer_id = ? AND seller_id = ?) ORDER BY last_message_at DESC NULLS LAST, created_at DESC LIMIT 1")
+                .get(userId, seller_id, seller_id, userId);
+            if (existingConversation) return { conversation: existingConversation, status: 200 };
+        }
 
         const conversationId = crypto.randomUUID();
         db.run(
