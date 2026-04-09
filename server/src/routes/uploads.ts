@@ -2,6 +2,7 @@ import { Elysia, t } from "elysia";
 import { jwt } from "@elysiajs/jwt";
 import { join } from "path";
 import { mkdir } from "fs/promises";
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import db from "../db";
 
 const UPLOADS_DIR = join(process.cwd(), "uploads");
@@ -14,6 +15,10 @@ const EXT_MAP: Record<string, string> = {
 };
 
 await mkdir(UPLOADS_DIR, { recursive: true });
+
+const s3 = new S3Client({ region: process.env.AWS_REGION ?? "us-east-1" });
+const S3_BUCKET = process.env.S3_BUCKET!;
+const S3_BASE_URL = `https://${S3_BUCKET}.s3.${process.env.AWS_REGION ?? "us-east-1"}.amazonaws.com`;
 
 const uploadsRoutes = new Elysia()
   .use(jwt({ name: "jwt", secret: process.env.JWT_SECRET! }))
@@ -39,13 +44,30 @@ const uploadsRoutes = new Elysia()
 
       const ext = EXT_MAP[file.type];
       const filename = `${crypto.randomUUID()}.${ext}`;
-      const filepath = join(UPLOADS_DIR, filename);
 
       const buffer = await file.arrayBuffer();
-      await Bun.write(filepath, buffer);
 
+      if (S3_BUCKET) {
+        try {
+          await s3.send(new PutObjectCommand({
+            Bucket: S3_BUCKET,
+            Key: filename,
+            Body: new Uint8Array(buffer),
+            ContentType: file.type,
+          }));
+        } catch (err: any) {
+          console.error("S3 upload error:", err);
+          return { message: `S3 error: ${err?.message ?? String(err)}`, status: 500 };
+        }
+        const url = `${S3_BASE_URL}/${filename}`;
+        return { url, s3_key: filename, status: 201 };
+      }
+
+      // Fallback: local disk
+      const filepath = join(UPLOADS_DIR, filename);
+      await Bun.write(filepath, buffer);
       const url = `/uploads/${filename}`;
-      return { url, status: 201 };
+      return { url, s3_key: filename, status: 201 };
     },
     {
       body: t.Object({ file: t.File() }),
@@ -64,12 +86,12 @@ const uploadsRoutes = new Elysia()
     if (!listing) return { message: "Listing not found", status: 404 };
     if (String(listing.seller_id) !== String(payload.id)) return { message: "Forbidden", status: 403 };
 
-    const { url, sort_order } = body as { url: string; sort_order?: number };
+    const { url, s3_key, sort_order } = body as { url: string; s3_key?: string; sort_order?: number };
     if (!url) return { message: "url is required", status: 400 };
 
     db.run(
       "INSERT INTO listing_images (listing_id, s3_key, s3_url, sort_order) VALUES (?, ?, ?, ?)",
-      [params.id, url, url, sort_order ?? 0]
+      [params.id, s3_key ?? url, url, sort_order ?? 0]
     );
 
     return { message: "Image attached", status: 201 };
@@ -87,12 +109,12 @@ const uploadsRoutes = new Elysia()
     if (!service) return { message: "Service not found", status: 404 };
     if (String(service.provider_id) !== String(payload.id)) return { message: "Forbidden", status: 403 };
 
-    const { url, sort_order } = body as { url: string; sort_order?: number };
+    const { url, s3_key, sort_order } = body as { url: string; s3_key?: string; sort_order?: number };
     if (!url) return { message: "url is required", status: 400 };
 
     db.run(
       "INSERT INTO service_images (service_id, s3_key, s3_url, sort_order) VALUES (?, ?, ?, ?)",
-      [params.id, url, url, sort_order ?? 0]
+      [params.id, s3_key ?? url, url, sort_order ?? 0]
     );
 
     return { message: "Image attached", status: 201 };
@@ -110,12 +132,12 @@ const uploadsRoutes = new Elysia()
     if (!event) return { message: "Event not found", status: 404 };
     if (String(event.organizer_id) !== String(payload.id)) return { message: "Forbidden", status: 403 };
 
-    const { url, sort_order } = body as { url: string; sort_order?: number };
+    const { url, s3_key, sort_order } = body as { url: string; s3_key?: string; sort_order?: number };
     if (!url) return { message: "url is required", status: 400 };
 
     db.run(
       "INSERT INTO event_images (event_id, s3_key, s3_url, sort_order) VALUES (?, ?, ?, ?)",
-      [params.id, url, url, sort_order ?? 0]
+      [params.id, s3_key ?? url, url, sort_order ?? 0]
     );
 
     return { message: "Image attached", status: 201 };
