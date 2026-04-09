@@ -383,12 +383,16 @@ function CreatePostModal({
         headers: { Authorization: `Bearer ${token}` },
         body: formData,
       });
+      if (!uploadRes.ok) {
+        const errData = await uploadRes.json().catch(() => ({}));
+        throw new Error(errData.message ?? `Upload failed with status ${uploadRes.status}`);
+      }
       const uploadData = await uploadRes.json();
       if (uploadData.url) {
         await fetch(attachUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ url: uploadData.url, sort_order: i }),
+          body: JSON.stringify({ url: uploadData.url, s3_key: uploadData.s3_key, sort_order: i }),
         });
       }
     }
@@ -455,7 +459,13 @@ function CreatePostModal({
             postType === "listing" ? API.listingImages(postId) :
             postType === "service" ? API.serviceImages(postId) :
             API.eventImages(postId);
-          await uploadImages(postId, attachUrl);
+          try {
+            await uploadImages(postId, attachUrl);
+          } catch (uploadErr: any) {
+            setError(`Post created but image upload failed: ${uploadErr?.message ?? "unknown error"}`);
+            onSaved(postType);
+            return;
+          }
         }
         setForm(EMPTY_FORM);
         setImages([]);
