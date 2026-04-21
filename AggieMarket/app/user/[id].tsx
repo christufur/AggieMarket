@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Avatar as FacehashAvatar,
   AvatarImage as FacehashAvatarImage,
@@ -31,6 +32,9 @@ export default function PublicProfileScreen() {
   const [events, setEvents] = useState<EventItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [contentTab, setContentTab] = useState<"listings" | "services" | "events">("listings");
+  const [msgText, setMsgText] = useState("");
+  const [msgSending, setMsgSending] = useState(false);
+  const [msgError, setMsgError] = useState("");
 
   // If viewing own profile, redirect
   useEffect(() => {
@@ -185,29 +189,60 @@ export default function PublicProfileScreen() {
               </Badge>
             </View>
 
-            <Pressable
-              onPress={async () => {
-                if (!token || !id) return;
-                const res = await fetch(API.conversations, {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-                  body: JSON.stringify({ seller_id: Number(id) }),
-                });
-                const data = await res.json();
-                if (data.conversation) router.push(`/inbox?conversation=${data.conversation.id}`);
-              }}
-              style={{
-                flexDirection: "row", alignItems: "center", gap: 8,
-                marginTop: 14, paddingHorizontal: 20, paddingVertical: 10,
-                borderRadius: 10, borderWidth: 1.5, borderColor: colors.primary,
-                backgroundColor: colors.primaryLight,
-              }}
-            >
-              <Ionicons name="chatbubble-outline" size={15} color={colors.primary} />
-              <Text style={{ fontSize: 13, fontWeight: "600", color: colors.primary }}>
-                Send Message
-              </Text>
-            </Pressable>
+            <View style={{ width: "100%", maxWidth: 360, marginTop: 14, gap: 8, paddingHorizontal: 16 }}>
+              <Textarea
+                value={msgText}
+                onChangeText={setMsgText}
+                placeholder={`Send ${profile.name} a message...`}
+                numberOfLines={3}
+                editable={!msgSending}
+              />
+              {msgError ? (
+                <Text style={{ fontSize: 12, color: colors.error }}>{msgError}</Text>
+              ) : null}
+              <Pressable
+                onPress={async () => {
+                  if (!token || !id || !msgText.trim()) return;
+                  setMsgSending(true);
+                  setMsgError("");
+                  try {
+                    const convRes = await fetch(API.conversations, {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                      body: JSON.stringify({ seller_id: Number(id) }),
+                    });
+                    const convData = await convRes.json();
+                    if (!convData.conversation) { setMsgError("Could not start conversation."); return; }
+                    await fetch(API.conversationMessages(convData.conversation.id), {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                      body: JSON.stringify({ content: msgText.trim() }),
+                    });
+                    router.push(`/inbox?conversation=${convData.conversation.id}`);
+                  } catch {
+                    setMsgError("Could not send message.");
+                  } finally {
+                    setMsgSending(false);
+                  }
+                }}
+                style={{
+                  flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+                  paddingHorizontal: 20, paddingVertical: 10,
+                  borderRadius: 10, borderWidth: 1.5, borderColor: colors.primary,
+                  backgroundColor: !msgText.trim() || msgSending ? colors.bg : colors.primaryLight,
+                  opacity: !msgText.trim() || msgSending ? 0.6 : 1,
+                }}
+              >
+                {msgSending ? (
+                  <ActivityIndicator size="small" color={colors.primary} />
+                ) : (
+                  <>
+                    <Ionicons name="send-outline" size={15} color={colors.primary} />
+                    <Text style={{ fontSize: 13, fontWeight: "600", color: colors.primary }}>Send Message</Text>
+                  </>
+                )}
+              </Pressable>
+            </View>
           </View>
 
           {/* Two-column layout */}

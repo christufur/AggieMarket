@@ -65,6 +65,9 @@ export default function EventDetailScreenWeb() {
   const [imgIdx, setImgIdx] = useState(0);
   const [saved, setSaved] = useState(false);
   const [savedId, setSavedId] = useState<number | null>(null);
+  const [msgText, setMsgText] = useState("");
+  const [msgSending, setMsgSending] = useState(false);
+  const [msgError, setMsgError] = useState("");
 
   // RSVP state
   const [rsvpStatus, setRsvpStatus] = useState<"going" | "interested" | null>(null);
@@ -156,16 +159,28 @@ export default function EventDetailScreenWeb() {
     } finally { setRsvpLoading(false); }
   };
 
-  const messageOrganizer = async () => {
-    if (!token || !event) return;
-    const res = await fetch(API.conversations, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ seller_id: event.organizer_id, event_id: event.id }),
-    });
-    const data = await res.json();
-    if (data.conversation) {
-      router.push(`/inbox?conversation=${data.conversation.id}`);
+  const sendFirstMessage = async () => {
+    if (!token || !event || !msgText.trim()) return;
+    setMsgSending(true);
+    setMsgError("");
+    try {
+      const convRes = await fetch(API.conversations, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ seller_id: event.organizer_id, event_id: event.id }),
+      });
+      const convData = await convRes.json();
+      if (!convData.conversation) { setMsgError("Could not start conversation."); return; }
+      await fetch(API.conversationMessages(convData.conversation.id), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ content: msgText.trim() }),
+      });
+      router.push(`/inbox?conversation=${convData.conversation.id}`);
+    } catch {
+      setMsgError("Could not send message.");
+    } finally {
+      setMsgSending(false);
     }
   };
 
@@ -538,10 +553,35 @@ export default function EventDetailScreenWeb() {
                         </Text>
                       </Button>
                     )}
-                    <Button variant="outline" onPress={messageOrganizer}>
-                      <Ionicons name="chatbubble-outline" size={16} color={colors.primary} />
-                      <Text className="ml-2 text-sm font-semibold" style={{ color: colors.primary }}>Message Organizer</Text>
-                    </Button>
+                    <View className="gap-1.5">
+                      <Text className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                        Message Organizer
+                      </Text>
+                      <Textarea
+                        value={msgText}
+                        onChangeText={setMsgText}
+                        placeholder="Hi, I have a question about this event..."
+                        numberOfLines={3}
+                        editable={!msgSending}
+                      />
+                      {msgError ? (
+                        <Text className="text-xs text-destructive">{msgError}</Text>
+                      ) : null}
+                      <Button
+                        variant="outline"
+                        onPress={sendFirstMessage}
+                        disabled={msgSending || !msgText.trim()}
+                      >
+                        {msgSending ? (
+                          <ActivityIndicator size="small" color={colors.primary} />
+                        ) : (
+                          <>
+                            <Ionicons name="send-outline" size={16} color={colors.primary} />
+                            <Text className="ml-2 text-sm font-semibold" style={{ color: colors.primary }}>Send Message</Text>
+                          </>
+                        )}
+                      </Button>
+                    </View>
                   </View>
                 )}
               </CardContent>

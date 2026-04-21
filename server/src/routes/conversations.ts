@@ -58,7 +58,7 @@ const conversationsRoutes = new Elysia()
             LEFT JOIN listings l ON l.id = c.listing_id
             LEFT JOIN services sv ON sv.id = c.service_id
             LEFT JOIN events ev ON ev.id = c.event_id
-            WHERE c.buyer_id = ? OR c.seller_id = ?
+            WHERE (c.buyer_id = ? OR c.seller_id = ?) AND c.last_message_at IS NOT NULL
             ORDER BY c.last_message_at DESC NULLS LAST
         `)
             .all(userId, userId, userId, userId);

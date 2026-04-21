@@ -45,6 +45,9 @@ export default function ListingDetailScreenWeb() {
   const [imgIdx, setImgIdx] = useState(0);
   const [saved, setSaved] = useState(false);
   const [savedId, setSavedId] = useState<number | null>(null);
+  const [msgText, setMsgText] = useState("");
+  const [msgSending, setMsgSending] = useState(false);
+  const [msgError, setMsgError] = useState("");
 
   useEffect(() => {
     if (!id) return;
@@ -93,16 +96,28 @@ export default function ListingDetailScreenWeb() {
     }
   };
 
-  const messageSeller = async () => {
-    if (!token || !listing) return;
-    const res = await fetch(API.conversations, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ seller_id: listing.seller_id, listing_id: listing.id }),
-    });
-    const data = await res.json();
-    if (data.conversation) {
-      router.push(`/inbox?conversation=${data.conversation.id}`);
+  const sendFirstMessage = async () => {
+    if (!token || !listing || !msgText.trim()) return;
+    setMsgSending(true);
+    setMsgError("");
+    try {
+      const convRes = await fetch(API.conversations, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ seller_id: listing.seller_id, listing_id: listing.id }),
+      });
+      const convData = await convRes.json();
+      if (!convData.conversation) { setMsgError("Could not start conversation."); return; }
+      await fetch(API.conversationMessages(convData.conversation.id), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ content: msgText.trim() }),
+      });
+      router.push(`/inbox?conversation=${convData.conversation.id}`);
+    } catch {
+      setMsgError("Could not send message.");
+    } finally {
+      setMsgSending(false);
     }
   };
 
@@ -380,20 +395,41 @@ export default function ListingDetailScreenWeb() {
                     </Button>
                   </View>
                 ) : (
-                  <View className="flex-row items-center gap-3 mt-2">
-                    <Button className="flex-1" onPress={messageSeller}>
-                      <Ionicons
-                        name="chatbubble-outline"
-                        size={16}
-                        color={colors.white}
-                      />
-                      <Text className="ml-2 text-sm font-semibold text-primary-foreground">
+                  <View className="gap-3 mt-2">
+                    <View className="gap-1.5">
+                      <Text className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                         Message Seller
                       </Text>
-                    </Button>
-                    <Pressable onPress={toggleSave} style={{ width: 44, height: 44, borderRadius: 22, borderWidth: 1, borderColor: colors.border, alignItems: "center", justifyContent: "center" }}>
-                      <Ionicons name={saved ? "heart" : "heart-outline"} size={22} color={colors.primary} />
-                    </Pressable>
+                      <Textarea
+                        value={msgText}
+                        onChangeText={setMsgText}
+                        placeholder="Hi, is this still available?"
+                        numberOfLines={3}
+                        editable={!msgSending}
+                      />
+                      {msgError ? (
+                        <Text className="text-xs text-destructive">{msgError}</Text>
+                      ) : null}
+                    </View>
+                    <View className="flex-row items-center gap-3">
+                      <Button
+                        className="flex-1"
+                        onPress={sendFirstMessage}
+                        disabled={msgSending || !msgText.trim()}
+                      >
+                        {msgSending ? (
+                          <ActivityIndicator size="small" color={colors.white} />
+                        ) : (
+                          <>
+                            <Ionicons name="send-outline" size={16} color={colors.white} />
+                            <Text className="ml-2 text-sm font-semibold text-primary-foreground">Send</Text>
+                          </>
+                        )}
+                      </Button>
+                      <Pressable onPress={toggleSave} style={{ width: 44, height: 44, borderRadius: 22, borderWidth: 1, borderColor: colors.border, alignItems: "center", justifyContent: "center" }}>
+                        <Ionicons name={saved ? "heart" : "heart-outline"} size={22} color={colors.primary} />
+                      </Pressable>
+                    </View>
                   </View>
                 )}
               </CardContent>
