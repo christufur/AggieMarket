@@ -1,11 +1,9 @@
 import { Elysia, t } from "elysia";
 import { jwt } from "@elysiajs/jwt";
-import { join } from "path";
-import { mkdir } from "fs/promises";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import db from "../db";
+import { requireAuth } from "../utils/auth";
 
-const UPLOADS_DIR = join(process.cwd(), "uploads");
 const MAX_SIZE = 5 * 1024 * 1024; // 5MB
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const EXT_MAP: Record<string, string> = {
@@ -14,8 +12,6 @@ const EXT_MAP: Record<string, string> = {
   "image/webp": "webp",
 };
 
-await mkdir(UPLOADS_DIR, { recursive: true });
-
 const s3 = new S3Client({ region: process.env.AWS_REGION ?? "us-east-1" });
 const S3_BUCKET = process.env.S3_BUCKET!;
 const S3_BASE_URL = `https://${S3_BUCKET}.s3.${process.env.AWS_REGION ?? "us-east-1"}.amazonaws.com`;
@@ -23,15 +19,11 @@ const S3_BASE_URL = `https://${S3_BUCKET}.s3.${process.env.AWS_REGION ?? "us-eas
 const uploadsRoutes = new Elysia()
   .use(jwt({ name: "jwt", secret: process.env.JWT_SECRET! }))
 
-  // UPLOAD image
   .post(
     "/upload",
     async ({ body, headers, jwt }) => {
-      const token = (headers as any).authorization?.replace("Bearer ", "");
-      if (!token) return { message: "Unauthorized", status: 401 };
-
-      const payload = await jwt.verify(token) as { id: number } | false;
-      if (!payload) return { message: "Invalid token", status: 401 };
+      const payload = await requireAuth(headers, jwt);
+      if ('status' in payload) return payload;
 
       const file = body.file as File;
 
@@ -44,29 +36,21 @@ const uploadsRoutes = new Elysia()
 
       const ext = EXT_MAP[file.type];
       const filename = `${crypto.randomUUID()}.${ext}`;
-
       const buffer = await file.arrayBuffer();
 
-      if (S3_BUCKET) {
-        try {
-          await s3.send(new PutObjectCommand({
-            Bucket: S3_BUCKET,
-            Key: filename,
-            Body: new Uint8Array(buffer),
-            ContentType: file.type,
-          }));
-        } catch (err: any) {
-          console.error("S3 upload error:", err);
-          return { message: `S3 error: ${err?.message ?? String(err)}`, status: 500 };
-        }
-        const url = `${S3_BASE_URL}/${filename}`;
-        return { url, s3_key: filename, status: 201 };
+      try {
+        await s3.send(new PutObjectCommand({
+          Bucket: S3_BUCKET,
+          Key: filename,
+          Body: new Uint8Array(buffer),
+          ContentType: file.type,
+        }));
+      } catch (err: unknown) {
+        console.error("S3 upload error:", err);
+        return { message: `S3 error: ${err instanceof Error ? err.message : String(err)}`, status: 500 };
       }
 
-      // Fallback: local disk
-      const filepath = join(UPLOADS_DIR, filename);
-      await Bun.write(filepath, buffer);
-      const url = `/uploads/${filename}`;
+      const url = `${S3_BASE_URL}/${filename}`;
       return { url, s3_key: filename, status: 201 };
     },
     {
@@ -74,13 +58,9 @@ const uploadsRoutes = new Elysia()
     }
   )
 
-  // ATTACH image to listing
   .post("/listings/:id/images", async ({ params, body, headers, jwt }) => {
-    const token = (headers as any).authorization?.replace("Bearer ", "");
-    if (!token) return { message: "Unauthorized", status: 401 };
-
-    const payload = await jwt.verify(token) as { id: number } | false;
-    if (!payload) return { message: "Invalid token", status: 401 };
+    const payload = await requireAuth(headers, jwt);
+    if ('status' in payload) return payload;
 
     const listing = db.query("SELECT * FROM listings WHERE id = ? AND status != 'deleted'").get(params.id) as { seller_id: number } | null;
     if (!listing) return { message: "Listing not found", status: 404 };
@@ -97,13 +77,9 @@ const uploadsRoutes = new Elysia()
     return { message: "Image attached", status: 201 };
   })
 
-  // ATTACH image to service
   .post("/services/:id/images", async ({ params, body, headers, jwt }) => {
-    const token = (headers as any).authorization?.replace("Bearer ", "");
-    if (!token) return { message: "Unauthorized", status: 401 };
-
-    const payload = await jwt.verify(token) as { id: number } | false;
-    if (!payload) return { message: "Invalid token", status: 401 };
+    const payload = await requireAuth(headers, jwt);
+    if ('status' in payload) return payload;
 
     const service = db.query("SELECT * FROM services WHERE id = ? AND status != 'deleted'").get(params.id) as { provider_id: number } | null;
     if (!service) return { message: "Service not found", status: 404 };
@@ -120,13 +96,9 @@ const uploadsRoutes = new Elysia()
     return { message: "Image attached", status: 201 };
   })
 
-  // ATTACH image to event
   .post("/events/:id/images", async ({ params, body, headers, jwt }) => {
-    const token = (headers as any).authorization?.replace("Bearer ", "");
-    if (!token) return { message: "Unauthorized", status: 401 };
-
-    const payload = await jwt.verify(token) as { id: number } | false;
-    if (!payload) return { message: "Invalid token", status: 401 };
+    const payload = await requireAuth(headers, jwt);
+    if ('status' in payload) return payload;
 
     const event = db.query("SELECT * FROM events WHERE id = ? AND status != 'deleted'").get(params.id) as { organizer_id: number } | null;
     if (!event) return { message: "Event not found", status: 404 };

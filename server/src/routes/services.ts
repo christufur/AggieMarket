@@ -2,15 +2,15 @@ import Elysia from "elysia";
 import { jwt } from "@elysiajs/jwt";
 import db from "../db";
 import crypto from "crypto";
+import { requireAuth, parsePagination } from "../utils/auth";
+
+type ServiceOwnerRow = { id: string; provider_id: number } | null;
 
 const servicesRoutes = new Elysia()
     .use(jwt({ name: "jwt", secret: process.env.JWT_SECRET! }))
 
-    // browse all services (public)
     .get("/services", ({ query }) => {
-        const page = Math.max(1, parseInt(query.page as string) || 1);
-        const limit = Math.min(50, Math.max(1, parseInt(query.limit as string) || 20));
-        const offset = (page - 1) * limit;
+        const { page, limit, offset } = parsePagination(query);
 
         const total = (db.query(
             `SELECT COUNT(*) as count FROM services s WHERE s.status = 'active'`
@@ -26,31 +26,36 @@ const servicesRoutes = new Elysia()
         return { services, total, page, limit, status: 200 };
     })
 
-    // services by category
-    .get("/services/category/:category", async ({ params, headers, jwt }) => {
-        const token = (headers as any).authorization?.replace("Bearer ", "");
-        if (!token) return { message: "Unauthorized", status: 401 };
+    .get("/services/popular", ({ query }) => {
+        const limit = Math.min(50, Math.max(1, parseInt(query.limit as string) || 10));
 
-        const payload = await jwt.verify(token) as { id: number; email: string } | false;
-        if (!payload) return { message: "Invalid token", status: 401 };
+        const services = db.query(
+            `SELECT s.*, u.name AS provider_name,
+                    (SELECT s3_url FROM service_images WHERE service_id = s.id ORDER BY sort_order ASC LIMIT 1) AS image_url
+             FROM services s
+             LEFT JOIN users u ON u.id = s.provider_id
+             WHERE s.status = 'active' ORDER BY s.created_at DESC LIMIT ?`
+        ).all(limit);
+
+        return { services, status: 200 };
+    })
+
+    .get("/services/category/:category", async ({ params, headers, jwt }) => {
+        const payload = await requireAuth(headers, jwt);
+        if ('status' in payload) return payload;
 
         const services = db.query("SELECT * FROM services WHERE category = ? AND status = 'active' ORDER BY created_at DESC").all(params.category);
         return { services, status: 200 };
     })
 
-    // services by provider
     .get("/services/provider/:provider_id", async ({ params, headers, jwt }) => {
-        const token = (headers as any).authorization?.replace("Bearer ", "");
-        if (!token) return { message: "Unauthorized", status: 401 };
-
-        const payload = await jwt.verify(token) as { id: number; email: string } | false;
-        if (!payload) return { message: "Invalid token", status: 401 };
+        const payload = await requireAuth(headers, jwt);
+        if ('status' in payload) return payload;
 
         const services = db.query("SELECT * FROM services WHERE provider_id = ? AND status = 'active' ORDER BY created_at DESC").all(params.provider_id);
         return { services, status: 200 };
     })
 
-    // get singular service (public)
     .get("/services/:id", async ({ params }) => {
         const service = db.query(
             `SELECT s.*, u.name AS provider_name
@@ -66,13 +71,9 @@ const servicesRoutes = new Elysia()
         return { service: { ...(service as object), images }, status: 200 };
     })
 
-    // create service
     .post("/services", async ({ body, headers, jwt }) => {
-        const token = (headers as any).authorization?.replace("Bearer ", "");
-        if (!token) return { message: "Unauthorized", status: 401 };
-
-        const payload = await jwt.verify(token) as { id: number; email: string } | false;
-        if (!payload) return { message: "Invalid token", status: 401 };
+        const payload = await requireAuth(headers, jwt);
+        if ('status' in payload) return payload;
 
         const { title, description, price, price_type, category, availability } = body as {
             title: string;
@@ -102,15 +103,11 @@ const servicesRoutes = new Elysia()
         return { service, status: 201 };
     })
 
-    // update service
     .patch("/services/:id", async ({ params, body, headers, jwt }) => {
-        const token = (headers as any).authorization?.replace("Bearer ", "");
-        if (!token) return { message: "Unauthorized", status: 401 };
+        const payload = await requireAuth(headers, jwt);
+        if ('status' in payload) return payload;
 
-        const payload = await jwt.verify(token) as { id: number; email: string } | false;
-        if (!payload) return { message: "Invalid token", status: 401 };
-
-        const existing = db.query("SELECT * FROM services WHERE id = ? AND status != 'deleted'").get(params.id) as any;
+        const existing = db.query("SELECT * FROM services WHERE id = ? AND status != 'deleted'").get(params.id) as ServiceOwnerRow;
         if (!existing) return { message: "Service not found", status: 404 };
         if (String(existing.provider_id) !== String(payload.id)) return { message: "Forbidden", status: 403 };
 
@@ -135,17 +132,11 @@ const servicesRoutes = new Elysia()
         return { service, status: 200 };
     })
 
-    // soft delete service
     .delete("/services/:id", async ({ params, headers, jwt }) => {
-        const token = (headers as any).authorization?.replace("Bearer ", "");
-        if (!token) return { message: "Unauthorized", status: 401 };
+        const payload = await requireAuth(headers, jwt);
+        if ('status' in payload) return payload;
 
-        const payload = await jwt.verify(token) as { id: number; email: string } | false;
-        if (!payload) return { message: "Invalid token", status: 401 };
-
-        const service = db.query("SELECT * FROM services WHERE id = ? AND status != 'deleted'").get(params.id) as {
-            id: string; provider_id: number;
-        } | null;
+        const service = db.query("SELECT * FROM services WHERE id = ? AND status != 'deleted'").get(params.id) as ServiceOwnerRow;
 
         if (!service) return { message: "Service not found", status: 404 };
         if (String(service.provider_id) !== String(payload.id)) return { message: "Forbidden", status: 403 };

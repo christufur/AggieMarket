@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback, memo } from "react";
 import {
   View, Pressable, ScrollView,
-  Modal, Switch, ActivityIndicator, Animated, useWindowDimensions, Image,
+  Switch, ActivityIndicator, Animated, useWindowDimensions, Image,
 } from "react-native";
 import { useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
@@ -19,7 +19,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -85,6 +85,7 @@ type PostForm = {
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 import { CONDITIONS, LISTING_CATEGORIES, SERVICE_CATEGORIES, EVENT_CATEGORIES, PRICE_TYPES } from "@/constants/categories";
+import { priceLabel, fmtDate as formatDate } from "@/lib/utils";
 
 const EMPTY_FORM: PostForm = {
   title: "", description: "", categories: [],
@@ -101,17 +102,6 @@ const TAB_LABELS: { key: TabType; label: string }[] = [
 ];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function formatDate(iso: string) {
-  const d = new Date(iso);
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-}
-
-function priceLabel(price: number | null, price_type: string | null) {
-  if (price == null) return "Free";
-  const suffix = price_type === "hourly" ? "/hr" : price_type === "starting_at" ? "+" : "";
-  return `$${price}${suffix}`;
-}
 
 // ─── Toast ────────────────────────────────────────────────────────────────────
 
@@ -461,8 +451,8 @@ function CreatePostModal({
             API.eventImages(postId);
           try {
             await uploadImages(postId, attachUrl);
-          } catch (uploadErr: any) {
-            setError(`Post created but image upload failed: ${uploadErr?.message ?? "unknown error"}`);
+          } catch (uploadErr: unknown) {
+            setError(`Post created but image upload failed: ${uploadErr instanceof Error ? uploadErr.message : "unknown error"}`);
             onSaved(postType);
             return;
           }
@@ -474,7 +464,8 @@ function CreatePostModal({
       } else {
         setError(data.message || "Failed to post.");
       }
-    } catch {
+    } catch (err) {
+      console.error("Post submit error:", err);
       setError("Could not connect to server.");
     } finally {
       setSaving(false);
@@ -776,24 +767,21 @@ export default function HomeWebScreen() {
   const fetchListings = useCallback(() => {
     fetch(API.listings)
       .then((r) => r.json())
-      .then((d) => { if (d.listings) setListings(d.listings); })
-      .catch(() => {});
+      .then((d) => { if (d.listings) setListings(d.listings); });
   }, []);
 
   const fetchServices = useCallback(() => {
     if (!token) return;
     fetch(API.services, { headers: { Authorization: `Bearer ${token}` } })
       .then((r) => r.json())
-      .then((d) => { if (d.services) setServices(d.services); })
-      .catch(() => {});
+      .then((d) => { if (d.services) setServices(d.services); });
   }, [token]);
 
   const fetchEvents = useCallback(() => {
     if (!token) return;
     fetch(API.events, { headers: { Authorization: `Bearer ${token}` } })
       .then((r) => r.json())
-      .then((d) => { if (d.events) setEvents(d.events); })
-      .catch(() => {});
+      .then((d) => { if (d.events) setEvents(d.events); });
   }, [token]);
 
   useEffect(() => {

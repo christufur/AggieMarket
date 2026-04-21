@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import {
-  View, ScrollView, ActivityIndicator, Pressable, Image, Platform,
+  View, ScrollView, ActivityIndicator, Pressable, Image,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Text } from "@/components/ui/text";
@@ -23,37 +23,8 @@ import { useAuth } from "@/context/AuthContext";
 import { useWebSocket } from "@/context/WebSocketContext";
 import { API } from "@/constants/api";
 import { colors } from "@/theme/colors";
-
-// ── Types ────────────────────────────────────────────────────────────────────
-
-type ProfileData = {
-  id: number; name: string; bio: string | null;
-  avatar_url: string | null; cover_url: string | null;
-  rating_avg: number; rating_count: number; created_at: string;
-  listings_count: number; services_count: number; events_count: number;
-};
-type ListingItem = {
-  id: string; title: string; price: number | null;
-  is_free: number; status: string; image_url: string | null; created_at: string;
-};
-type ServiceItem = {
-  id: string; title: string; price: number | null;
-  price_type: string | null; image_url: string | null; created_at: string;
-};
-type EventItem = {
-  id: string; title: string; starts_at: string;
-  is_free: number; ticket_price: number | null; image_url: string | null; created_at: string;
-};
-
-// ── Helpers ──────────────────────────────────────────────────────────────────
-
-function fmtDate(iso: string) {
-  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-}
-
-function fmtJoined(iso: string) {
-  return "Joined " + new Date(iso).toLocaleDateString("en-US", { month: "long", year: "numeric" });
-}
+import type { ProfileData, ListingItem, ServiceItem, EventItem } from "@/types";
+import { fmtDate, fmtJoined } from "@/lib/utils";
 
 // ── Sub-components ───────────────────────────────────────────────────────────
 
@@ -127,8 +98,7 @@ export default function ProfileScreen() {
         setProfile((p) => p ? { ...p, name: data.user.name, bio: data.user.bio } : p);
         setEditOpen(false);
       }
-    } catch { /* ignore */ }
-    finally { setSaving(false); }
+    } finally { setSaving(false); }
   };
 
   const deleteListing = async (id: string) => {

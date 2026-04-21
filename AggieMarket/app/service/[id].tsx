@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/dialog";
 import { PRICE_TYPES, SERVICE_CATEGORIES } from "@/constants/categories";
 import { colors } from "@/theme/colors";
+import { priceLabel } from "@/lib/utils";
 
 type ServiceDetail = {
   id: string;
@@ -33,17 +34,6 @@ type ServiceDetail = {
   provider_name: string | null;
   images: { url: string; sort_order: number }[];
 };
-
-function priceLabel(price: number | null, price_type: string | null) {
-  if (price == null) return "Free";
-  const suffix =
-    price_type === "hourly"
-      ? "/hr"
-      : price_type === "starting_at"
-        ? "+"
-        : "";
-  return `$${price}${suffix}`;
-}
 
 export default function ServiceDetailScreenWeb() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -73,8 +63,7 @@ export default function ServiceDetailScreenWeb() {
     if (!id || !token) return;
     fetch(`${API.savedCheck}?service_id=${id}`, { headers: { Authorization: `Bearer ${token}` } })
       .then((r) => { if (!r.ok) throw new Error(); return r.json(); })
-      .then((data) => { setSaved(data.saved); setSavedId(data.saved_id); })
-      .catch(() => {});
+      .then((data) => { setSaved(data.saved); setSavedId(data.saved_id); });
   }, [id, token]);
 
   // Edit state
@@ -89,37 +78,33 @@ export default function ServiceDetailScreenWeb() {
 
   const toggleSave = async () => {
     if (!token) return;
-    try {
-      if (saved && savedId) {
-        await fetch(API.savedItem(savedId), { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
-        setSaved(false);
-        setSavedId(null);
-      } else {
-        const res = await fetch(API.saved, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ service_id: id }),
-        });
-        if (!res.ok) return;
-        const data = await res.json();
-        if (data.saved) { setSaved(true); setSavedId(data.saved.id); }
-      }
-    } catch { /* ignore */ }
+    if (saved && savedId) {
+      await fetch(API.savedItem(savedId), { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+      setSaved(false);
+      setSavedId(null);
+    } else {
+      const res = await fetch(API.saved, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ service_id: id }),
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.saved) { setSaved(true); setSavedId(data.saved.id); }
+    }
   };
 
   const contactProvider = async () => {
     if (!token || !service) return;
-    try {
-      const res = await fetch(API.conversations, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ seller_id: service.provider_id, service_id: service.id }),
-      });
-      const data = await res.json();
-      if (data.conversation) {
-        router.push(`/inbox?conversation=${data.conversation.id}`);
-      }
-    } catch { /* ignore */ }
+    const res = await fetch(API.conversations, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ seller_id: service.provider_id, service_id: service.id }),
+    });
+    const data = await res.json();
+    if (data.conversation) {
+      router.push(`/inbox?conversation=${data.conversation.id}`);
+    }
   };
 
   const openEdit = () => {
@@ -154,8 +139,7 @@ export default function ServiceDetailScreenWeb() {
         setService((prev) => prev ? { ...prev, ...data.service, images: prev.images } : prev);
         setEditOpen(false);
       }
-    } catch { /* ignore */ }
-    finally { setSaving(false); }
+    } finally { setSaving(false); }
   };
 
   if (loading) {

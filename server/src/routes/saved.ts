@@ -1,17 +1,14 @@
 import { Elysia } from "elysia";
 import { jwt } from "@elysiajs/jwt";
 import db from "../db";
+import { requireAuth } from "../utils/auth";
 
 const savedRoutes = new Elysia()
   .use(jwt({ name: "jwt", secret: process.env.JWT_SECRET! }))
 
-  // GET all saved items for logged-in user
   .get("/saved", async ({ headers, jwt }) => {
-    const token = (headers as any).authorization?.replace("Bearer ", "");
-    if (!token) return { message: "Unauthorized", status: 401 };
-
-    const payload = await jwt.verify(token) as { id: number } | false;
-    if (!payload) return { message: "Invalid token", status: 401 };
+    const payload = await requireAuth(headers, jwt);
+    if ('status' in payload) return payload;
 
     const listings = db.query(`
       SELECT si.id as saved_id, l.*, u.name as seller_name,
@@ -46,13 +43,9 @@ const savedRoutes = new Elysia()
     return { listings, services, events, status: 200 };
   })
 
-  // CHECK if an item is saved
   .get("/saved/check", async ({ query, headers, jwt }) => {
-    const token = (headers as any).authorization?.replace("Bearer ", "");
-    if (!token) return { message: "Unauthorized", status: 401 };
-
-    const payload = await jwt.verify(token) as { id: number } | false;
-    if (!payload) return { message: "Invalid token", status: 401 };
+    const payload = await requireAuth(headers, jwt);
+    if ('status' in payload) return payload;
 
     const { listing_id, service_id, event_id } = query as {
       listing_id?: string;
@@ -60,25 +53,21 @@ const savedRoutes = new Elysia()
       event_id?: string;
     };
 
-    let row: any = null;
+    let row: { id: number } | null = null;
     if (listing_id) {
-      row = db.query("SELECT id FROM saved_items WHERE user_id = ? AND listing_id = ?").get(payload.id, listing_id);
+      row = db.query("SELECT id FROM saved_items WHERE user_id = ? AND listing_id = ?").get(payload.id, listing_id) as { id: number } | null;
     } else if (service_id) {
-      row = db.query("SELECT id FROM saved_items WHERE user_id = ? AND service_id = ?").get(payload.id, service_id);
+      row = db.query("SELECT id FROM saved_items WHERE user_id = ? AND service_id = ?").get(payload.id, service_id) as { id: number } | null;
     } else if (event_id) {
-      row = db.query("SELECT id FROM saved_items WHERE user_id = ? AND event_id = ?").get(payload.id, event_id);
+      row = db.query("SELECT id FROM saved_items WHERE user_id = ? AND event_id = ?").get(payload.id, event_id) as { id: number } | null;
     }
 
-    return { saved: !!row, saved_id: row ? (row as { id: number }).id : null, status: 200 };
+    return { saved: !!row, saved_id: row ? row.id : null, status: 200 };
   })
 
-  // SAVE an item
   .post("/saved", async ({ body, headers, jwt }) => {
-    const token = (headers as any).authorization?.replace("Bearer ", "");
-    if (!token) return { message: "Unauthorized", status: 401 };
-
-    const payload = await jwt.verify(token) as { id: number } | false;
-    if (!payload) return { message: "Invalid token", status: 401 };
+    const payload = await requireAuth(headers, jwt);
+    if ('status' in payload) return payload;
 
     const { listing_id, service_id, event_id } = body as {
       listing_id?: string;
@@ -99,21 +88,17 @@ const savedRoutes = new Elysia()
 
       const saved = db.query("SELECT * FROM saved_items WHERE user_id = ? ORDER BY id DESC LIMIT 1").get(payload.id);
       return { saved, status: 201 };
-    } catch (err: any) {
-      if (err.message?.includes("UNIQUE constraint")) {
+    } catch (err: unknown) {
+      if ((err as Error).message?.includes("UNIQUE constraint")) {
         return { message: "Item already saved", status: 409 };
       }
       throw err;
     }
   })
 
-  // UNSAVE an item
   .delete("/saved/:id", async ({ params, headers, jwt }) => {
-    const token = (headers as any).authorization?.replace("Bearer ", "");
-    if (!token) return { message: "Unauthorized", status: 401 };
-
-    const payload = await jwt.verify(token) as { id: number } | false;
-    if (!payload) return { message: "Invalid token", status: 401 };
+    const payload = await requireAuth(headers, jwt);
+    if ('status' in payload) return payload;
 
     const row = db.query("SELECT * FROM saved_items WHERE id = ?").get(params.id) as { user_id: number } | null;
     if (!row) return { message: "Saved item not found", status: 404 };

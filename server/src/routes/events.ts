@@ -2,16 +2,16 @@ import Elysia from "elysia";
 import { jwt } from "@elysiajs/jwt";
 import db from "../db";
 import crypto from "crypto";
+import { requireAuth, parsePagination } from "../utils/auth";
 
+type EventOwnerRow = { id: string; organizer_id: number; max_attendees: number | null; status: string } | null;
+type AttendeeRow = { status: string; [key: string]: unknown };
 
 const eventsRoutes = new Elysia()
     .use(jwt({ name: "jwt", secret: process.env.JWT_SECRET! }))
 
-    // browse all events (public)
     .get("/events", ({ query }) => {
-        const page = Math.max(1, parseInt(query.page as string) || 1);
-        const limit = Math.min(50, Math.max(1, parseInt(query.limit as string) || 20));
-        const offset = (page - 1) * limit;
+        const { page, limit, offset } = parsePagination(query);
 
         const total = (db.query(
             `SELECT COUNT(*) as count FROM events e WHERE e.status = 'active' AND e.starts_at >= datetime('now')`
@@ -28,19 +28,31 @@ const eventsRoutes = new Elysia()
         return { events, total, page, limit, status: 200 };
     })
 
-    // events by category
+    .get("/events/popular", ({ query }) => {
+        const limit = Math.min(50, Math.max(1, parseInt(query.limit as string) || 10));
+
+        const events = db.query(
+            `SELECT e.*, u.name AS organizer_name,
+                    (SELECT s3_url FROM event_images WHERE event_id = e.id ORDER BY sort_order ASC LIMIT 1) AS image_url
+             FROM events e
+             LEFT JOIN users u ON u.id = e.organizer_id
+             WHERE e.status = 'active' AND e.starts_at >= datetime('now')
+             ORDER BY e.starts_at ASC LIMIT ?`
+        ).all(limit);
+
+        return { events, status: 200 };
+    })
+
     .get("/events/category/:category", ({ params }) => {
         const events = db.query("SELECT * FROM events WHERE category = ? AND status = 'active' AND starts_at >= datetime('now') ORDER BY starts_at ASC").all(params.category);
         return { events, status: 200 };
     })
 
-    // events by organizer (public)
     .get("/events/organizer/:organizer_id", ({ params }) => {
         const events = db.query("SELECT * FROM events WHERE organizer_id = ? AND status = 'active' ORDER BY starts_at ASC").all(params.organizer_id);
         return { events, status: 200 };
     })
 
-    // get singular event
     .get("/events/:id", async ({ params }) => {
         const event = db.query(
             `SELECT e.*, u.name AS organizer_name
@@ -63,13 +75,9 @@ const eventsRoutes = new Elysia()
         return { event: { ...(event as object), images, attendee_count: counts.total, going_count: counts.going_count, interested_count: counts.interested_count }, status: 200 };
     })
 
-    // create event
     .post("/events", async ({ body, headers, jwt }) => {
-        const token = (headers as any).authorization?.replace("Bearer ", "");
-        if (!token) return { message: "Unauthorized", status: 401 };
-
-        const payload = await jwt.verify(token) as { id: number; email: string } | false;
-        if (!payload) return { message: "Invalid token", status: 401 };
+        const payload = await requireAuth(headers, jwt);
+        if ('status' in payload) return payload;
 
         const { title, description, category, location, starts_at, ends_at, is_free, ticket_price, max_attendees, external_link } = body as {
             title: string;
@@ -99,15 +107,11 @@ const eventsRoutes = new Elysia()
         return { event, status: 201 };
     })
 
-    // update event
     .patch("/events/:id", async ({ params, body, headers, jwt }) => {
-        const token = (headers as any).authorization?.replace("Bearer ", "");
-        if (!token) return { message: "Unauthorized", status: 401 };
+        const payload = await requireAuth(headers, jwt);
+        if ('status' in payload) return payload;
 
-        const payload = await jwt.verify(token) as { id: number; email: string } | false;
-        if (!payload) return { message: "Invalid token", status: 401 };
-
-        const existing = db.query("SELECT * FROM events WHERE id = ? AND status != 'deleted'").get(params.id) as any;
+        const existing = db.query("SELECT * FROM events WHERE id = ? AND status != 'deleted'").get(params.id) as EventOwnerRow;
         if (!existing) return { message: "Event not found", status: 404 };
         if (String(existing.organizer_id) !== String(payload.id)) return { message: "Forbidden", status: 403 };
 
@@ -145,15 +149,11 @@ const eventsRoutes = new Elysia()
         return { event, status: 200 };
     })
 
-    // RSVP to event
     .post("/events/:id/rsvp", async ({ params, body, headers, jwt }) => {
-        const token = (headers as any).authorization?.replace("Bearer ", "");
-        if (!token) return { message: "Unauthorized", status: 401 };
+        const payload = await requireAuth(headers, jwt);
+        if ('status' in payload) return payload;
 
-        const payload = await jwt.verify(token) as { id: number } | false;
-        if (!payload) return { message: "Invalid token", status: 401 };
-
-        const event = db.query("SELECT * FROM events WHERE id = ? AND status = 'active'").get(params.id) as any;
+        const event = db.query("SELECT * FROM events WHERE id = ? AND status = 'active'").get(params.id) as EventOwnerRow;
         if (!event) return { message: "Event not found", status: 404 };
 
         const { status } = body as { status?: string };
@@ -183,13 +183,9 @@ const eventsRoutes = new Elysia()
         return { rsvp, count: count.count, status: 201 };
     })
 
-    // Cancel RSVP
     .delete("/events/:id/rsvp", async ({ params, headers, jwt }) => {
-        const token = (headers as any).authorization?.replace("Bearer ", "");
-        if (!token) return { message: "Unauthorized", status: 401 };
-
-        const payload = await jwt.verify(token) as { id: number } | false;
-        if (!payload) return { message: "Invalid token", status: 401 };
+        const payload = await requireAuth(headers, jwt);
+        if ('status' in payload) return payload;
 
         db.run("DELETE FROM event_attendees WHERE event_id = ? AND user_id = ?", [params.id, payload.id]);
 
@@ -197,25 +193,17 @@ const eventsRoutes = new Elysia()
         return { message: "RSVP cancelled", count: count.count, status: 200 };
     })
 
-    // Check RSVP status
     .get("/events/:id/rsvp", async ({ params, headers, jwt }) => {
-        const token = (headers as any).authorization?.replace("Bearer ", "");
-        if (!token) return { message: "Unauthorized", status: 401 };
-
-        const payload = await jwt.verify(token) as { id: number } | false;
-        if (!payload) return { message: "Invalid token", status: 401 };
+        const payload = await requireAuth(headers, jwt);
+        if ('status' in payload) return payload;
 
         const rsvp = db.query("SELECT * FROM event_attendees WHERE event_id = ? AND user_id = ?").get(params.id, payload.id);
         return { rsvp: rsvp || null, status: 200 };
     })
 
-    // List attendees
     .get("/events/:id/attendees", async ({ params, headers, jwt }) => {
-        const token = (headers as any).authorization?.replace("Bearer ", "");
-        if (!token) return { message: "Unauthorized", status: 401 };
-
-        const payload = await jwt.verify(token) as { id: number } | false;
-        if (!payload) return { message: "Invalid token", status: 401 };
+        const payload = await requireAuth(headers, jwt);
+        if ('status' in payload) return payload;
 
         const attendees = db.query(`
           SELECT ea.*, u.name, u.avatar_url
@@ -223,21 +211,17 @@ const eventsRoutes = new Elysia()
           LEFT JOIN users u ON u.id = ea.user_id
           WHERE ea.event_id = ?
           ORDER BY ea.created_at ASC
-        `).all(params.id);
+        `).all(params.id) as AttendeeRow[];
 
-        const going = attendees.filter((a: any) => a.status === "going").length;
-        const interested = attendees.filter((a: any) => a.status === "interested").length;
+        const going = attendees.filter(a => a.status === "going").length;
+        const interested = attendees.filter(a => a.status === "interested").length;
 
         return { attendees, going_count: going, interested_count: interested, status: 200 };
     })
 
-    // soft delete event
     .delete("/events/:id", async ({ params, headers, jwt }) => {
-        const token = (headers as any).authorization?.replace("Bearer ", "");
-        if (!token) return { message: "Unauthorized", status: 401 };
-
-        const payload = await jwt.verify(token) as { id: number; email: string } | false;
-        if (!payload) return { message: "Invalid token", status: 401 };
+        const payload = await requireAuth(headers, jwt);
+        if ('status' in payload) return payload;
 
         const event = db.query("SELECT * FROM events WHERE id = ? AND organizer_id = ?").get(params.id, payload.id);
         if (!event) return { message: "Event not found", status: 404 };

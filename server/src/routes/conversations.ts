@@ -2,8 +2,22 @@ import { Elysia } from "elysia";
 import { jwt } from "@elysiajs/jwt";
 import db from "../db";
 import { sendToUser } from "../utils/connections";
+import { requireAuth } from "../utils/auth";
 
-/** Row shape for `SELECT * FROM conversations` (bun:sqlite infers `.get()` as `{}` otherwise). */
+function sendExpoPush(
+    tokens: string[],
+    title: string,
+    body: string,
+    data: Record<string, string>
+) {
+    const messages = tokens.map((to) => ({ to, title, body, data, sound: "default" }));
+    fetch("https://exp.host/--/api/v2/push/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify(messages),
+    }).catch(() => {}); // fire and forget — never block message delivery
+}
+
 type ConversationRow = {
     id: string;
     listing_id: string | null;
@@ -18,16 +32,9 @@ type ConversationRow = {
 const conversationsRoutes = new Elysia()
     .use(jwt({ name: "jwt", secret: process.env.JWT_SECRET! }))
 
-    // GET /conversations — list all conversations for the authenticated user
-    // 1. Auth
-    // 2. Query conversations with partner info, last message preview, and unread count
-    // 3. Return sorted by last_message_at DESC
     .get("/conversations", async ({ headers, jwt }) => {
-        const token = (headers as any).authorization?.replace("Bearer ", "");
-        if (!token) return { message: "Unauthorized", status: 401 };
-
-        const payload = await jwt.verify(token) as { id: number; email: string } | false;
-        if (!payload) return { message: "Invalid token", status: 401 };
+        const payload = await requireAuth(headers, jwt);
+        if ('status' in payload) return payload;
         const userId = Number(payload.id);
 
         const conversations = db
@@ -55,20 +62,12 @@ const conversationsRoutes = new Elysia()
             ORDER BY c.last_message_at DESC NULLS LAST
         `)
             .all(userId, userId, userId, userId);
-        return { conversations, status: 200 }; 
+        return { conversations, status: 200 };
     })
 
-    // POST /conversations — create or find existing conversation
-    // 1. Auth
-    // 2. Reject if seller_id === userId (can't message yourself)
-    // 3. Check for existing conversation between buyer+seller for this item
-    // 4. If found, return it. If not, insert with crypto.randomUUID(), return new row.
     .post("/conversations", async ({ body, headers, jwt }) => {
-        const token = (headers as any).authorization?.replace("Bearer ", "");
-        if (!token) return { message: "Unauthorized", status: 401 };
-
-        const payload = await jwt.verify(token) as { id: number; email: string } | false;
-        if (!payload) return { message: "Invalid token", status: 401 };
+        const payload = await requireAuth(headers, jwt);
+        if ('status' in payload) return payload;
         const userId = Number(payload.id);
 
         const { seller_id, listing_id, service_id, event_id } = body as {
@@ -90,7 +89,6 @@ const conversationsRoutes = new Elysia()
                 .get(userId, seller_id, listing_id ?? null, service_id ?? null, event_id ?? null);
             if (existingConversation) return { conversation: existingConversation, status: 200 };
         } else {
-            // Find the most recent conversation between these two users (any item or none)
             const existingConversation = db
                 .query("SELECT * FROM conversations WHERE (buyer_id = ? AND seller_id = ?) OR (buyer_id = ? AND seller_id = ?) ORDER BY last_message_at DESC NULLS LAST, created_at DESC LIMIT 1")
                 .get(userId, seller_id, seller_id, userId);
@@ -107,16 +105,9 @@ const conversationsRoutes = new Elysia()
         return { conversation, status: 201 };
     })
 
-    // GET /conversations/unread-count — total unread messages across all conversations
-    // 1. Auth
-    // 2. Count messages where sender_id != me AND read_at IS NULL
-    // 3. Return { count }
     .get("/conversations/unread-count", async ({ headers, jwt }) => {
-        const token = (headers as any).authorization?.replace("Bearer ", "");
-        if (!token) return { message: "Unauthorized", status: 401 };
-
-        const payload = await jwt.verify(token) as { id: number; email: string } | false;
-        if (!payload) return { message: "Invalid token", status: 401 };
+        const payload = await requireAuth(headers, jwt);
+        if ('status' in payload) return payload;
         const userId = Number(payload.id);
 
         const row = db
@@ -125,16 +116,9 @@ const conversationsRoutes = new Elysia()
         return { count: row?.count ?? 0, status: 200 };
     })
 
-    // GET /conversations/:id/messages — message history for a conversation
-    // 1. Auth
-    // 2. Verify user is a participant (buyer or seller), 403 if not
-    // 3. Fetch messages with sender name, ordered by created_at ASC
     .get("/conversations/:id/messages", async ({ params, headers, jwt }) => {
-        const token = (headers as any).authorization?.replace("Bearer ", "");
-        if (!token) return { message: "Unauthorized", status: 401 };
-
-        const payload = await jwt.verify(token) as { id: number; email: string } | false;
-        if (!payload) return { message: "Invalid token", status: 401 };
+        const payload = await requireAuth(headers, jwt);
+        if ('status' in payload) return payload;
         const userId = Number(payload.id);
 
         const conversation = db
@@ -148,18 +132,9 @@ const conversationsRoutes = new Elysia()
         return { messages, status: 200 };
     })
 
-    // POST /conversations/:id/messages — send a message
-    // 1. Auth
-    // 2. Verify participant
-    // 3. Insert message with crypto.randomUUID()
-    // 4. Update conversations.last_message_at
-    // 5. Push new_message event to recipient via WebSocket
     .post("/conversations/:id/messages", async ({ params, body, headers, jwt }) => {
-        const token = (headers as any).authorization?.replace("Bearer ", "");
-        if (!token) return { message: "Unauthorized", status: 401 };
-
-        const payload = await jwt.verify(token) as { id: number; email: string } | false;
-        if (!payload) return { message: "Invalid token", status: 401 };
+        const payload = await requireAuth(headers, jwt);
+        if ('status' in payload) return payload;
         const userId = Number(payload.id);
 
         const conversation = db
@@ -175,25 +150,33 @@ const conversationsRoutes = new Elysia()
         const message = db.query("SELECT * FROM messages WHERE id = ?").get(messageId as string);
         if (!message) return { message: "Failed to create message", status: 500 };
         db.run("UPDATE conversations SET last_message_at = datetime('now') WHERE id = ?", [params.id]);
-        sendToUser(conversation.buyer_id === userId ? conversation.seller_id : conversation.buyer_id, {
+        const recipientId = conversation.buyer_id === userId ? conversation.seller_id : conversation.buyer_id;
+        sendToUser(recipientId, {
             type: "new_message",
             conversationId: params.id,
             message: message,
         });
+
+        // APNs / Expo push notification to recipient (if app is backgrounded)
+        const sender = db.query("SELECT name FROM users WHERE id = ?").get(userId) as { name: string } | null;
+        const pushTokenRows = db.query(
+            "SELECT token FROM push_tokens WHERE user_id = ? AND is_active = 1"
+        ).all(recipientId) as { token: string }[];
+        if (sender && pushTokenRows.length > 0) {
+            sendExpoPush(
+                pushTokenRows.map((r) => r.token),
+                sender.name,
+                content.length > 100 ? content.slice(0, 97) + "…" : content,
+                { conversation_id: params.id }
+            );
+        }
+
         return { message, status: 201 };
     })
 
-    // PATCH /conversations/:id/read — mark messages as read
-    // 1. Auth
-    // 2. Verify participant
-    // 3. Update read_at for all unread messages where sender != me
-    // 4. Return { updated: changes }
     .patch("/conversations/:id/read", async ({ params, headers, jwt }) => {
-        const token = (headers as any).authorization?.replace("Bearer ", "");
-        if (!token) return { message: "Unauthorized", status: 401 };
-
-        const payload = await jwt.verify(token) as { id: number; email: string } | false;
-        if (!payload) return { message: "Invalid token", status: 401 };
+        const payload = await requireAuth(headers, jwt);
+        if ('status' in payload) return payload;
         const userId = Number(payload.id);
 
         const conversation = db

@@ -16,36 +16,8 @@ import {
   AvatarImage as FacehashAvatarImage,
   AvatarFallback as FacehashAvatarFallback,
 } from "facehash";
-
-type ProfileData = {
-  id: number; name: string; bio: string | null;
-  avatar_url: string | null; cover_url: string | null;
-  rating_avg: number; rating_count: number; created_at: string;
-  listings_count: number; services_count: number; events_count: number;
-};
-
-type ListingItem = {
-  id: string; title: string; price: number | null;
-  is_free: number; status: string; image_url: string | null;
-};
-
-type ServiceItem = {
-  id: string; title: string; price: number | null;
-  price_type: string | null; image_url: string | null;
-};
-
-type EventItem = {
-  id: string; title: string; starts_at: string;
-  is_free: number; ticket_price: number | null; image_url: string | null;
-};
-
-function fmtDate(iso: string) {
-  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-}
-
-function fmtJoined(iso: string) {
-  return "Joined " + new Date(iso).toLocaleDateString("en-US", { month: "long", year: "numeric" });
-}
+import type { ProfileData, ListingItem, ServiceItem, EventItem } from "@/types";
+import { fmtDate, fmtJoined } from "@/lib/utils";
 
 export default function PublicProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -216,15 +188,13 @@ export default function PublicProfileScreen() {
             <Pressable
               onPress={async () => {
                 if (!token || !id) return;
-                try {
-                  const res = await fetch(API.conversations, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-                    body: JSON.stringify({ seller_id: Number(id) }),
-                  });
-                  const data = await res.json();
-                  if (data.conversation) router.push(`/inbox?conversation=${data.conversation.id}`);
-                } catch {}
+                const res = await fetch(API.conversations, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                  body: JSON.stringify({ seller_id: Number(id) }),
+                });
+                const data = await res.json();
+                if (data.conversation) router.push(`/inbox?conversation=${data.conversation.id}`);
               }}
               style={{
                 flexDirection: "row", alignItems: "center", gap: 8,

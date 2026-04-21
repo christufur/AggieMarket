@@ -3,24 +3,32 @@ import { jwt } from "@elysiajs/jwt";
 import db from "../db";
 import { addConnection, removeConnection, sendToUser } from "../utils/connections";
 
+type WsData = {
+    jwt: { verify(token: string): Promise<Record<string, unknown> | false> };
+    request: Request;
+    userId?: number;
+};
+
+type ConvoParticipants = { buyer_id: number; seller_id: number } | null;
+
 const wsRoutes = new Elysia()
     .use(jwt({ name: "jwt", secret: process.env.JWT_SECRET! }))
     .ws("/ws/chat", {
         async open(ws) {
             // Auth via query param — browser WebSocket API can't set headers
-            const url = new URL(ws.data.request.url);
+            const url = new URL((ws.data as WsData).request.url);
             const token = url.searchParams.get("token");
             if (!token) { ws.close(4001, "No token"); return; }
 
-            const payload = await (ws.data as any).jwt.verify(token);
+            const payload = await (ws.data as WsData).jwt.verify(token);
             if (!payload) { ws.close(4001, "Invalid token"); return; }
 
-            (ws as any).userId = Number(payload.id);
-            addConnection(Number(payload.id), ws);
+            (ws.data as WsData).userId = Number(payload["id"]);
+            addConnection(Number(payload["id"]), ws.raw);
         },
 
         message(ws, raw) {
-            const userId = (ws as any).userId;
+            const userId = (ws.data as WsData).userId;
             if (!userId) return;
 
             try {
@@ -29,7 +37,7 @@ const wsRoutes = new Elysia()
                 if (msg.type === "typing" && msg.conversationId) {
                     const convo = db
                         .query("SELECT buyer_id, seller_id FROM conversations WHERE id = ?")
-                        .get(msg.conversationId) as any;
+                        .get(msg.conversationId) as ConvoParticipants;
                     if (!convo) return;
 
                     const recipientId = convo.buyer_id === userId ? convo.seller_id : convo.buyer_id;
@@ -45,8 +53,8 @@ const wsRoutes = new Elysia()
         },
 
         close(ws) {
-            const userId = (ws as any).userId;
-            if (userId) removeConnection(userId, ws);
+            const userId = (ws.data as WsData).userId;
+            if (userId) removeConnection(userId, ws.raw);
         },
     });
 

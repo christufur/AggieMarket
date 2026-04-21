@@ -8,6 +8,7 @@ import { API } from "@/constants/api";
 import { colors } from "@/theme/colors";
 import { Text } from "@/components/ui/text";
 import { Card, CardContent } from "@/components/ui/card";
+import { fmtDate } from "@/lib/utils";
 
 type SavedListing = {
   saved_id: number;
@@ -39,10 +40,6 @@ type SavedEvent = {
   organizer_name: string;
   image_url: string | null;
 };
-
-function fmtDate(iso: string) {
-  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-}
 
 export default function SavedScreen() {
   const { token } = useAuth();

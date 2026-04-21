@@ -13,40 +13,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useWebSocket } from "@/context/WebSocketContext";
 import { API } from "@/constants/api";
 
-// ─── Types ───────────────────────────────────────────────────────────────────
-
-type Conversation = {
-  id: string;
-  listing_id: string | null;
-  service_id: string | null;
-  event_id: string | null;
-  buyer_id: number;
-  seller_id: number;
-  partner_id: number;
-  partner_name: string;
-  partner_avatar: string | null;
-  last_message_content: string | null;
-  last_message_at: string | null;
-  unread_count: number;
-  listing_title: string | null;
-  listing_price: number | null;
-  listing_is_free: number | null;
-  listing_image: string | null;
-  service_title: string | null;
-  service_price: number | null;
-  service_image: string | null;
-  event_title: string | null;
-};
-
-type Message = {
-  id: string;
-  conversation_id: string;
-  sender_id: number;
-  content: string;
-  sender_name: string;
-  read_at: string | null;
-  created_at: string;
-};
+import type { Conversation, Message } from "@/types";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -269,26 +236,25 @@ function ChatPanel({ conversation, token, userId }: {
     })
       .then((r) => r.json())
       .then((data) => { if (data.messages) setMessages(data.messages); })
-      .catch(() => {})
       .finally(() => setLoading(false));
 
     // Mark as read
     fetch(API.conversationRead(conversation.id), {
       method: "PATCH",
       headers: { Authorization: `Bearer ${token}` },
-    }).catch(() => {});
+    });
   }, [conversation.id, token]);
 
   // Subscribe to new messages via WebSocket
   useEffect(() => {
-    const unsub = subscribe("new_message", (payload: any) => {
+    const unsub = subscribe("new_message", (payload) => {
       if (payload.conversationId === conversation.id && payload.message) {
-        setMessages((prev) => [...prev, payload.message]);
+        setMessages((prev) => [...prev, payload.message as Message]);
         // Mark as read since we're viewing this conversation
         fetch(API.conversationRead(conversation.id), {
           method: "PATCH",
           headers: { Authorization: `Bearer ${token}` },
-        }).catch(() => {});
+        });
       }
     });
     return unsub;
@@ -296,7 +262,7 @@ function ChatPanel({ conversation, token, userId }: {
 
   // Subscribe to typing indicators
   useEffect(() => {
-    const unsub = subscribe("typing", (payload: any) => {
+    const unsub = subscribe("typing", (payload) => {
       if (payload.conversationId === conversation.id && payload.userId !== userId) {
         setTyping(true);
         if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
@@ -511,14 +477,12 @@ export default function InboxScreen() {
 
   const fetchConversations = useCallback(async () => {
     if (!token) return;
-    try {
-      const res = await fetch(API.conversations, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      if (data.conversations) setConversations(data.conversations);
-    } catch { /* ignore */ }
-    finally { setLoading(false); }
+    const res = await fetch(API.conversations, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const data = await res.json();
+    if (data.conversations) setConversations(data.conversations);
+    setLoading(false);
   }, [token]);
 
   useEffect(() => { fetchConversations(); }, [fetchConversations]);

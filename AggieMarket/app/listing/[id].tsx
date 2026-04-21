@@ -62,8 +62,7 @@ export default function ListingDetailScreenWeb() {
     if (!id || !token) return;
     fetch(`${API.savedCheck}?listing_id=${id}`, { headers: { Authorization: `Bearer ${token}` } })
       .then((r) => { if (!r.ok) throw new Error(); return r.json(); })
-      .then((data) => { setSaved(data.saved); setSavedId(data.saved_id); })
-      .catch(() => {});
+      .then((data) => { setSaved(data.saved); setSavedId(data.saved_id); });
   }, [id, token]);
 
   // Edit state
@@ -78,37 +77,33 @@ export default function ListingDetailScreenWeb() {
 
   const toggleSave = async () => {
     if (!token) return;
-    try {
-      if (saved && savedId) {
-        await fetch(API.savedItem(savedId), { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
-        setSaved(false);
-        setSavedId(null);
-      } else {
-        const res = await fetch(API.saved, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ listing_id: id }),
-        });
-        if (!res.ok) return;
-        const data = await res.json();
-        if (data.saved) { setSaved(true); setSavedId(data.saved.id); }
-      }
-    } catch { /* ignore */ }
+    if (saved && savedId) {
+      await fetch(API.savedItem(savedId), { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+      setSaved(false);
+      setSavedId(null);
+    } else {
+      const res = await fetch(API.saved, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ listing_id: id }),
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.saved) { setSaved(true); setSavedId(data.saved.id); }
+    }
   };
 
   const messageSeller = async () => {
     if (!token || !listing) return;
-    try {
-      const res = await fetch(API.conversations, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ seller_id: listing.seller_id, listing_id: listing.id }),
-      });
-      const data = await res.json();
-      if (data.conversation) {
-        router.push(`/inbox?conversation=${data.conversation.id}`);
-      }
-    } catch { /* ignore */ }
+    const res = await fetch(API.conversations, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ seller_id: listing.seller_id, listing_id: listing.id }),
+    });
+    const data = await res.json();
+    if (data.conversation) {
+      router.push(`/inbox?conversation=${data.conversation.id}`);
+    }
   };
 
   const openEdit = () => {
@@ -143,8 +138,7 @@ export default function ListingDetailScreenWeb() {
         setListing((prev) => prev ? { ...prev, ...data.listing, images: prev.images } : prev);
         setEditOpen(false);
       }
-    } catch { /* ignore */ }
-    finally { setSaving(false); }
+    } finally { setSaving(false); }
   };
 
   if (loading) {

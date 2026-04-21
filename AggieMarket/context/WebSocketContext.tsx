@@ -80,17 +80,13 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
 
     const fetchUnread = async () => {
-      try {
-        const res = await fetch(API.conversationUnreadCount, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!res.ok) return;
-        const data = (await res.json()) as { count?: number };
-        if (typeof data.count === "number" && !cancelled) {
-          setUnreadCount(data.count);
-        }
-      } catch {
-        // ignore
+      const res = await fetch(API.conversationUnreadCount, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return;
+      const data = (await res.json()) as { count?: number };
+      if (typeof data.count === "number" && !cancelled) {
+        setUnreadCount(data.count);
       }
     };
 
@@ -99,8 +95,8 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
       subs?.forEach((cb) => {
         try {
           cb(payload);
-        } catch {
-          // subscriber error — isolate
+        } catch (err) {
+          console.error("WebSocket subscriber error:", err);
         }
       });
     };

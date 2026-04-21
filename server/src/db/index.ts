@@ -262,5 +262,33 @@ db.run(`
   CREATE INDEX IF NOT EXISTS idx_services_provider ON services(provider_id);
 `);
 
+// Push tokens for APNs / Expo push notifications
+db.run(`
+  CREATE TABLE IF NOT EXISTS push_tokens (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    token TEXT NOT NULL,
+    platform TEXT NOT NULL DEFAULT 'ios',
+    is_active INTEGER DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, token),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+`);
+
+// is_admin column on users (TASK-9 admin moderation)
+try {
+  db.run(`ALTER TABLE users ADD COLUMN is_admin INTEGER DEFAULT 0`);
+} catch {
+  // column already exists
+}
+
+// Seed version tracking (TASK-6 idempotent seed)
+db.run(`
+  CREATE TABLE IF NOT EXISTS seed_meta (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+  );
+`);
 
 export default db;

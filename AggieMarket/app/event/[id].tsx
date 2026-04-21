@@ -104,16 +104,14 @@ export default function EventDetailScreenWeb() {
     if (!id || !token) return;
     fetch(`${API.savedCheck}?event_id=${id}`, { headers: { Authorization: `Bearer ${token}` } })
       .then((r) => { if (!r.ok) throw new Error(); return r.json(); })
-      .then((data) => { setSaved(data.saved); setSavedId(data.saved_id); })
-      .catch(() => {});
+      .then((data) => { setSaved(data.saved); setSavedId(data.saved_id); });
   }, [id, token]);
 
   useEffect(() => {
     if (!id || !token) return;
     fetch(API.eventRsvp(id), { headers: { Authorization: `Bearer ${token}` } })
       .then((r) => { if (!r.ok) throw new Error(); return r.json(); })
-      .then((data) => { if (data.rsvp) setRsvpStatus(data.rsvp.status); })
-      .catch(() => {});
+      .then((data) => { if (data.rsvp) setRsvpStatus(data.rsvp.status); });
   }, [id, token]);
 
   const toggleSave = async () => {
@@ -155,23 +153,20 @@ export default function EventDetailScreenWeb() {
         setRsvpStatus("going");
         setAttendeeCount(data.count ?? attendeeCount + 1);
       }
-    } catch { /* ignore */ }
-    finally { setRsvpLoading(false); }
+    } finally { setRsvpLoading(false); }
   };
 
   const messageOrganizer = async () => {
     if (!token || !event) return;
-    try {
-      const res = await fetch(API.conversations, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ seller_id: event.organizer_id, event_id: event.id }),
-      });
-      const data = await res.json();
-      if (data.conversation) {
-        router.push(`/inbox?conversation=${data.conversation.id}`);
-      }
-    } catch { /* ignore */ }
+    const res = await fetch(API.conversations, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ seller_id: event.organizer_id, event_id: event.id }),
+    });
+    const data = await res.json();
+    if (data.conversation) {
+      router.push(`/inbox?conversation=${data.conversation.id}`);
+    }
   };
 
   const openEdit = () => {
@@ -214,8 +209,7 @@ export default function EventDetailScreenWeb() {
         setEvent((prev) => prev ? { ...prev, ...data.event, images: prev.images } : prev);
         setEditOpen(false);
       }
-    } catch { /* ignore */ }
-    finally { setSaving(false); }
+    } finally { setSaving(false); }
   };
 
   if (loading) {

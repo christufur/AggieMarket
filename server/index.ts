@@ -1,6 +1,5 @@
 import { Elysia } from "elysia";
 import { cors } from "@elysiajs/cors";
-import { staticPlugin } from "@elysiajs/static";
 
 if (!process.env.JWT_SECRET) {
   throw new Error("JWT_SECRET environment variable is required");
@@ -18,7 +17,6 @@ import savedRoutes from "./src/routes/saved";
 
 const app = new Elysia()
   .use(cors())
-  .use(staticPlugin({ assets: "uploads", prefix: "/uploads" }))
   .use(authRoutes)
   .use(listingsRoutes)
   .use(servicesRoutes)
