@@ -12,6 +12,7 @@ export const API = {
   login: `${BASE}/auth/login`,
   me: `${BASE}/auth/me`,
   listings: `${BASE}/listings`,
+  search: `${BASE}/search`,
   listing: (id: string) => `${BASE}/listings/${id}`,
   listingImages: (id: string) => `${BASE}/listings/${id}/images`,
   services: `${BASE}/services`,

@@ -127,7 +127,7 @@ const authRoutes = new Elysia()
 
         //3. fetch user from db
         const user = db.query(
-            "SELECT id, name, email, status FROM users WHERE id = ?"
+            "SELECT id, name, email, status, is_admin FROM users WHERE id = ?"
         ).get(payload.id);
 
         if (!user) {

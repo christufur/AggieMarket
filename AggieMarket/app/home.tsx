@@ -743,6 +743,7 @@ export default function HomeWebScreen() {
   const router = useRouter();
 
   const [listings, setListings] = useState<Listing[]>([]);
+  const [listingResults, setListingResults] = useState<Listing[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
   const [activeTab, setActiveTab] = useState<TabType>("listing");
@@ -758,6 +759,23 @@ export default function HomeWebScreen() {
     fetch(API.listings)
       .then((r) => r.json())
       .then((d) => { if (d.listings) setListings(d.listings); })
+      .catch(() => {});
+  }, []);
+
+  const fetchListingResults = useCallback((searchQuery: string, category: string | null, condition: string | null) => {
+    const params = new URLSearchParams();
+    const trimmedQuery = searchQuery.trim();
+
+    if (trimmedQuery) params.set("q", trimmedQuery);
+    if (category) params.set("category", category);
+    if (condition) params.set("condition", condition);
+    params.set("limit", "100");
+
+    const url = params.toString() ? `${API.search}?${params.toString()}` : API.search;
+
+    fetch(url)
+      .then((r) => r.json())
+      .then((d) => { if (d.listings) setListingResults(d.listings); })
       .catch(() => {});
   }, []);
 
@@ -783,6 +801,16 @@ export default function HomeWebScreen() {
     fetchEvents();
   }, [fetchListings, fetchServices, fetchEvents]);
 
+  useEffect(() => {
+    if (activeTab !== "listing") return;
+
+    const timeout = setTimeout(() => {
+      fetchListingResults(query, activeCategory, activeCondition);
+    }, 200);
+
+    return () => clearTimeout(timeout);
+  }, [activeTab, activeCategory, activeCondition, query, fetchListingResults]);
+
   const switchTab = useCallback((tab: TabType) => {
     setActiveTab(tab);
     setActiveCategory(null);
@@ -794,12 +822,13 @@ export default function HomeWebScreen() {
 
   const handleSaved = useCallback((type: PostType) => {
     fetchListings();
+    fetchListingResults(query, activeCategory, activeCondition);
     fetchServices();
     fetchEvents();
     setToastMessage(type === "listing" ? "Listing posted!" : type === "service" ? "Service posted!" : "Event posted!");
     setToastVisible(false);
     setTimeout(() => setToastVisible(true), 50);
-  }, [fetchListings, fetchServices, fetchEvents]);
+  }, [activeCategory, activeCondition, fetchListingResults, fetchListings, fetchServices, fetchEvents, query]);
 
   // Filtered data per tab
   function matchesCat(category: string, filter: string | null) {
@@ -807,10 +836,7 @@ export default function HomeWebScreen() {
     return category.split(",").some((c) => c.trim().toLowerCase() === filter.toLowerCase());
   }
 
-  const filteredListings = listings.filter((l) => {
-    const matchQ = !query || l.title.toLowerCase().includes(query.toLowerCase());
-    return matchQ && matchesCat(l.category, activeCategory) && (!activeCondition || l.condition === activeCondition);
-  });
+  const filteredListings = listingResults;
 
   const filteredServices = services.filter((s) => {
     const matchQ = !query || s.title.toLowerCase().includes(query.toLowerCase());
