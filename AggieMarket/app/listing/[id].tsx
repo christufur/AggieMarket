@@ -51,7 +51,7 @@ export default function ListingDetailScreenWeb() {
     return (
       <View
         className="flex-1 items-center justify-center bg-background"
-        style={{ minHeight: "100vh" as any }}
+        style={{ minHeight: "70vh" as any }}
       >
         <ActivityIndicator color="#212121" />
       </View>
@@ -62,7 +62,7 @@ export default function ListingDetailScreenWeb() {
     return (
       <View
         className="flex-1 items-center justify-center gap-3 bg-background"
-        style={{ minHeight: "100vh" as any }}
+        style={{ minHeight: "70vh" as any }}
       >
         <Text className="text-sm text-muted-foreground">
           {error || "Something went wrong."}
@@ -90,7 +90,7 @@ export default function ListingDetailScreenWeb() {
   return (
     <ScrollView
       className="flex-1 bg-background"
-      contentContainerStyle={{ minHeight: "100vh" as any }}
+      contentContainerStyle={{ minHeight: "40vh" as any }}
     >
       {/* Nav */}
       <View className="border-b border-border bg-card">
@@ -109,8 +109,8 @@ export default function ListingDetailScreenWeb() {
       </View>
 
       <View
-        className="px-6 py-8"
-        style={{ maxWidth: 900, width: "100%", alignSelf: "center" }}
+        className="px-6 py-4"
+        style={{ maxHeight: "50vh", overflow: "hidden", maxWidth: 900, width: "70%", alignSelf: "center" }}
       >
         <View className="flex-row gap-8" style={{ flexWrap: "wrap" }}>
           {/* Image section */}
