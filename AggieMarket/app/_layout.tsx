@@ -2,6 +2,7 @@ import "../global.css";
 import { useEffect } from "react";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { AuthProvider, useAuth } from "../context/AuthContext";
+import { WebSocketProvider } from "../context/WebSocketContext";
 
 function RootNavigator() {
   const { user, isLoading } = useAuth();
@@ -28,7 +29,9 @@ function RootNavigator() {
 export default function RootLayout() {
   return (
     <AuthProvider>
-      <RootNavigator />
+      <WebSocketProvider>
+        <RootNavigator />
+      </WebSocketProvider>
     </AuthProvider>
   );
 }

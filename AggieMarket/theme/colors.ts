@@ -9,6 +9,19 @@ export const colors = {
   mid: "#BDBDBD",
   dark: "#757575",
   ink: "#212121",
+
+  // Brand
+  primary: "#8C0B42",
+  primaryDark: "#5E072D",
+  primaryDarkest: "#380418",
+  primaryLight: "#FDF2F6",
+  primaryBorder: "#F9C9DB",
+
+  // Semantic
+  success: "#2e7d32",
+  successLight: "#E8F5E9",
+  error: "#D32F2F",
+  errorLight: "#FFF0F0",
 } as const;
 
 export type Colors = typeof colors;

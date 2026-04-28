@@ -1,11 +1,11 @@
 import { Elysia } from "elysia";
 import { jwt } from "@elysiajs/jwt";
 import db from "../db";
+import { requireAuth } from "../utils/auth";
 
 const usersRoutes = new Elysia()
-  .use(jwt({ name: "jwt", secret: process.env.JWT_SECRET || "secret" }))
+  .use(jwt({ name: "jwt", secret: process.env.JWT_SECRET! }))
 
-  // GET public profile
   .get("/users/:id", ({ params }) => {
     const user = db.query(`
       SELECT id, name, bio, avatar_url, cover_url, rating_avg, rating_count, created_at
@@ -37,7 +37,6 @@ const usersRoutes = new Elysia()
     };
   })
 
-  // GET user's listings
   .get("/users/:id/listings", ({ params }) => {
     const listings = db.query(`
       SELECT l.*,
@@ -50,7 +49,6 @@ const usersRoutes = new Elysia()
     return { listings, status: 200 };
   })
 
-  // GET user's services
   .get("/users/:id/services", ({ params }) => {
     const services = db.query(`
       SELECT s.*,
@@ -63,7 +61,6 @@ const usersRoutes = new Elysia()
     return { services, status: 200 };
   })
 
-  // GET user's events
   .get("/users/:id/events", ({ params }) => {
     const events = db.query(`
       SELECT e.*,
@@ -76,13 +73,25 @@ const usersRoutes = new Elysia()
     return { events, status: 200 };
   })
 
-  // UPDATE own profile
-  .patch("/users/me", async ({ body, headers, jwt }) => {
-    const token = (headers as any).authorization?.replace("Bearer ", "");
-    if (!token) return { message: "Unauthorized", status: 401 };
+  .post("/users/me/push-token", async ({ body, headers, jwt }) => {
+    const payload = await requireAuth(headers, jwt);
+    if ('status' in payload) return payload;
 
-    const payload = await jwt.verify(token) as { id: number } | false;
-    if (!payload) return { message: "Invalid token", status: 401 };
+    const { token, platform } = body as { token: string; platform?: string };
+    if (!token) return { message: "token is required", status: 400 };
+
+    db.run(
+      `INSERT INTO push_tokens (user_id, token, platform, is_active) VALUES (?, ?, ?, 1)
+       ON CONFLICT(user_id, token) DO UPDATE SET is_active = 1`,
+      [payload.id, token, platform ?? 'ios']
+    );
+
+    return { message: "Push token registered", status: 200 };
+  })
+
+  .patch("/users/me", async ({ body, headers, jwt }) => {
+    const payload = await requireAuth(headers, jwt);
+    if ('status' in payload) return payload;
 
     const { name, bio, avatar_url, cover_url } = body as {
       name?: string;
