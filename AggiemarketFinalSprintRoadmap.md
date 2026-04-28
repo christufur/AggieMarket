@@ -22,14 +22,14 @@ A fresh user installs AggieMarket from TestFlight, registers with `@nmsu.edu`, b
 | Task                               | Christopher                      | Genesis         | Demetrius        |
 | ---------------------------------- | -------------------------------- | --------------- | ---------------- |
 | TASK-1 Home screen real data       | ✅ Backend endpoints done        | Frontend wiring | —                |
-| TASK-2 FTS5 search                 | —                                | Frontend wiring | Backend (finish) |
+| TASK-2 FTS5 search                 | —                                | Frontend wiring | ✅ Backend done  |
 | TASK-3 Client WebSocket            | —                                | All             | —                |
 | TASK-4 TestFlight build            | 🔄 In progress (enrollment)      | —               | —                |
 | TASK-5 APNs push                   | ✅ Backend done / frontend next  | —               | —                |
 | TASK-6 Seed data                   | ✅ Script ready (run on prod)    | —               | —                |
-| TASK-7 Reviews and Ratings         | —                                | Frontend        | Backend          |
-| TASK-8 Mark as Sold + profile tabs | —                                | Frontend        | Backend          |
-| TASK-9 Admin and moderation        | Admin dashboard frontend         | Report button   | Backend          |
+| TASK-7 Reviews and Ratings         | —                                | Frontend        | ✅ Backend done  |
+| TASK-8 Mark as Sold + profile tabs | —                                | Frontend        | ✅ Backend done  |
+| TASK-9 Admin and moderation        | Admin dashboard frontend         | Report button   | ✅ Backend done  |
 | TASK-10 Bug sweep                  | Coordinator                      | Frontend pass   | Backend pass     |
 
 ---
@@ -65,15 +65,15 @@ A fresh user installs AggieMarket from TestFlight, registers with `@nmsu.edu`, b
 
 ## TASK-2 — Finish FTS5 search
 
-**Owners:** Demetrius (backend) + Genesis (frontend)
+**Owners:** Demetrius (backend) ✅ + Genesis (frontend)
 
 **Goal:** The search screen and category chips filter real results. Demetrius already started the FTS5 scaffold — finish it.
 
-**Demetrius — backend:**
+**Demetrius — backend:** ✅ done Apr 28
 
-- Confirm the FTS5 virtual table is built against `listings` (title + description). If not, create it and backfill. Match the existing migration pattern.
-- Add `GET /search?q=<string>&category=<string>&min_price=<n>&max_price=<n>&limit=<n>&offset=<n>` that queries the FTS5 table and joins back to `listings`. Listings only for now — no services/events.
-- Empty `q` with other params set should still return results (acts like browse).
+- ✅ FTS5 virtual tables built against `listings`, `services`, `events` in `server/src/db/index.ts` with insert/update/delete triggers.
+- ✅ `GET /search?q=&category=&min_price=&max_price=&limit=&offset=&condition=` — queries FTS5, joins to `listings`. Lives in `server/src/routes/listings.ts`.
+- ✅ `API.search` added to `AggieMarket/constants/api.ts`.
 
 **Genesis — frontend:**
 
@@ -202,17 +202,16 @@ ssh ec2  →  cd /path/to/server  →  bun scripts/seed.ts
 
 ## TASK-7 — Reviews and Ratings
 
-**Owners:** Demetrius (backend) + Genesis (frontend)
+**Owners:** Demetrius (backend) ✅ + Genesis (frontend)
 
 **Goal:** After a listing is marked sold, both buyer and seller can leave a 1–5 star rating with an optional text review. Ratings show on the user's profile and drive their star average.
 
-**Demetrius — backend:**
+**Demetrius — backend:** ✅ done Apr 28
 
-- `ratings` table: `(id, transaction_id, reviewer_id, reviewee_id, stars INT 1-5, body TEXT NULLABLE, created_at)`.
-- Unique constraint on `(transaction_id, reviewer_id)` so each party can only rate once per transaction.
-- `POST /ratings` — requires auth, validates that the caller was part of the transaction, that the transaction is closed, and that they haven't already rated.
-- `GET /users/:id/ratings?limit=&offset=` — paginated list of ratings a user has received.
-- Trigger or route-level update that recalculates `users.rating_avg` and `users.rating_count` on insert/delete.
+- ✅ `ratings` table with unique constraint on `(transaction_id, reviewer_id)`.
+- ✅ `POST /ratings` — auth-gated, validates caller was part of transaction, transaction is closed, not already rated.
+- ✅ `GET /users/:id/ratings?limit=&offset=` — paginated, joins reviewer name.
+- ✅ SQLite triggers (`ratings_ai`, `ratings_ad`, `ratings_au`) auto-update `users.rating_avg` and `users.rating_count`.
 
 **Genesis — frontend:**
 
@@ -232,16 +231,15 @@ ssh ec2  →  cd /path/to/server  →  bun scripts/seed.ts
 
 ## TASK-8 — Mark as Sold + profile tabs
 
-**Owners:** Demetrius (backend) + Genesis (frontend)
+**Owners:** Demetrius (backend) ✅ + Genesis (frontend)
 
 **Goal:** Sellers can mark their own listings as sold. Sold listings show up on their profile under a `Sold` tab (separate from `Active`), with a visible "Sold" badge. This is also what unlocks the rating flow in TASK-7.
 
-**Demetrius — backend:**
+**Demetrius — backend:** ✅ done Apr 28
 
-- If no `transactions` table yet, add a minimal one: `(id, listing_id, seller_id, buyer_id NULLABLE, sold_at)`. Buyer nullable because the seller may mark sold without specifying who bought.
-- Update `listings.status` to support `active | sold | deleted` if not already. Soft-delete already exists as `deleted`.
-- `POST /listings/:id/mark-sold` — auth-gated, owner-only, accepts optional `buyer_id`. Creates a transactions row and flips listing status to `sold`.
-- `GET /users/:id/listings?status=active|sold` — returns the user's listings filtered by status. Powers the profile tabs.
+- ✅ `transactions` table: `(id, listing_id UNIQUE, seller_id, buyer_id NULLABLE, sold_at)`.
+- ✅ `POST /listings/:id/mark-sold` — auth-gated, owner-only, optional `buyer_id`, creates transaction row, flips listing to `sold`. Validates buyer exists and is not the seller.
+- ✅ `GET /users/:id/listings?status=active|sold` — filters by status, defaults to showing both `active` and `sold`.
 
 **Genesis — frontend:**
 
@@ -261,18 +259,18 @@ ssh ec2  →  cd /path/to/server  →  bun scripts/seed.ts
 
 ## TASK-9 — Admin and moderation
 
-**Owners:** Demetrius (backend) + Genesis (report button) + Christopher (admin dashboard frontend)
+**Owners:** Demetrius (backend) ✅ + Genesis (report button) + Christopher (admin dashboard frontend)
 
 **Goal:** Any user can report a listing or a message. Admins (flagged by `users.is_admin`) see pending reports in a dashboard and can resolve or dismiss. Resolving removes the offending content.
 
-**Demetrius — backend:**
+**Demetrius — backend:** ✅ done Apr 28
 
-- `reports` table: `(id, reporter_id, target_type ENUM('listing', 'message', 'user'), target_id, reason, description, status ENUM('pending', 'resolved', 'dismissed'), reviewed_by NULLABLE, admin_note NULLABLE, created_at)`.
-- `POST /reports` — auth-gated, any user can report.
-- `GET /admin/reports?status=pending` — admin-only (middleware checks `users.is_admin`). Paginated, target content inlined.
-- `POST /admin/reports/:id/resolve` — admin-only. If target is a listing, soft-deletes it. If target is a message, flags it hidden. Records `reviewed_by` and `admin_note`.
-- `POST /admin/reports/:id/dismiss` — admin-only. Marks dismissed with optional note.
-- Admin middleware rejects non-admin. 404 over 403 if you want to avoid leaking route existence.
+- ✅ `reports` table with `target_type IN ('listing','message','user')`, `status IN ('pending','resolved','dismissed')`.
+- ✅ `POST /reports` — auth-gated, validates target exists before inserting.
+- ✅ `GET /admin/reports?status=&limit=&offset=` — admin-only (404 for non-admins), returns inlined target content (listing/message/user fields).
+- ✅ `POST /admin/reports/:id/resolve` — soft-deletes listings, hides messages, records `reviewed_by` + `admin_note`.
+- ✅ `POST /admin/reports/:id/dismiss` — marks dismissed with optional note.
+- ✅ `requireAdmin` helper in `reports.ts` returns 404 (not 403) to avoid leaking route existence.
 
 **Genesis — frontend:**
 
