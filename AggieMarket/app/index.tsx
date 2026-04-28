@@ -71,7 +71,7 @@ export default function LandingScreenWeb() {
             </Button>
             <Button size="sm" onPress={() => router.push("/register")}>
               <Text className="text-sm font-semibold text-primary-foreground">
-                Get Started
+                Sign Up
               </Text>
             </Button>
           </View>
@@ -107,7 +107,7 @@ export default function LandingScreenWeb() {
         <View className="mt-10 flex-row items-center gap-4">
           <Button size="lg" onPress={() => router.push("/register")}>
             <Text className="text-base font-semibold text-primary-foreground">
-              Get Started
+              Sign Up
             </Text>
           </Button>
           <Button

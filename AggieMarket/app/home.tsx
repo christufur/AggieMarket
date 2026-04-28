@@ -20,6 +20,7 @@ import { Separator } from "@/components/ui/separator";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
+import {Navbar} from "@/components/ui/navbar";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -402,8 +403,8 @@ function CreatePostModal({
 
   const categories =
     postType === "listing" ? LISTING_CATEGORIES :
-    postType === "service" ? SERVICE_CATEGORIES :
-    EVENT_CATEGORIES;
+      postType === "service" ? SERVICE_CATEGORIES :
+        EVENT_CATEGORIES;
 
   async function submit() {
     setError("");
@@ -454,8 +455,8 @@ function CreatePostModal({
         if (postId && images.length > 0) {
           const attachUrl =
             postType === "listing" ? API.listingImages(postId) :
-            postType === "service" ? API.serviceImages(postId) :
-            API.eventImages(postId);
+              postType === "service" ? API.serviceImages(postId) :
+                API.eventImages(postId);
           await uploadImages(postId, attachUrl);
         }
         setForm(EMPTY_FORM);
@@ -758,7 +759,7 @@ export default function HomeWebScreen() {
     fetch(API.listings)
       .then((r) => r.json())
       .then((d) => { if (d.listings) setListings(d.listings); })
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   const fetchServices = useCallback(() => {
@@ -766,7 +767,7 @@ export default function HomeWebScreen() {
     fetch(API.services, { headers: { Authorization: `Bearer ${token}` } })
       .then((r) => r.json())
       .then((d) => { if (d.services) setServices(d.services); })
-      .catch(() => {});
+      .catch(() => { });
   }, [token]);
 
   const fetchEvents = useCallback(() => {
@@ -774,7 +775,7 @@ export default function HomeWebScreen() {
     fetch(API.events, { headers: { Authorization: `Bearer ${token}` } })
       .then((r) => r.json())
       .then((d) => { if (d.events) setEvents(d.events); })
-      .catch(() => {});
+      .catch(() => { });
   }, [token]);
 
   useEffect(() => {
@@ -824,38 +825,45 @@ export default function HomeWebScreen() {
 
   const currentCategories =
     activeTab === "listing" ? LISTING_CATEGORIES :
-    activeTab === "service" ? SERVICE_CATEGORIES :
-    EVENT_CATEGORIES;
+      activeTab === "service" ? SERVICE_CATEGORIES :
+        EVENT_CATEGORIES;
 
   const currentCount =
     activeTab === "listing" ? filteredListings.length :
-    activeTab === "service" ? filteredServices.length :
-    filteredEvents.length;
+      activeTab === "service" ? filteredServices.length :
+        filteredEvents.length;
 
   const isMobile = width < 768;
   const SIDEBAR = isMobile ? 0 : 220;
   const contentWidth = Math.min(width - (isMobile ? 16 : 48), 1280);
   const gridCols = isMobile ? (width < 480 ? 1 : 2) : 3;
 
+
   const tabPlaceholder =
     activeTab === "listing" ? "Search listings\u2026" :
-    activeTab === "service" ? "Search services\u2026" :
-    "Search events\u2026";
+      activeTab === "service" ? "Search services\u2026" :
+        "Search events\u2026";
 
   const emptyPostLabel =
     activeTab === "listing" ? "Post a Listing" :
-    activeTab === "service" ? "Post a Service" :
-    "Post an Event";
+      activeTab === "service" ? "Post a Service" :
+        "Post an Event";
 
   const emptyNoResultMsg =
     activeTab === "listing" ? "No listings found" :
-    activeTab === "service" ? "No services found" :
-    "No events found";
+      activeTab === "service" ? "No services found" :
+        "No events found";
 
   return (
     <View className="flex-1 bg-background">
       {/* ── Navbar ── */}
-      <View
+      <Navbar
+        onNewPost={() => setModalVisible(true)}
+        isMobile={isMobile}
+        contentWidth={contentWidth}
+      />
+
+      {/* <View
         className="bg-card border-b border-border h-[60px] justify-center z-[100]"
         style={{ position: "sticky" as any, top: 0, paddingHorizontal: isMobile ? 12 : 24 }}
       >
@@ -896,7 +904,7 @@ export default function HomeWebScreen() {
             </Button>
           </View>
         </View>
-      </View>
+      </View> */}
 
       <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
         {/* ── Banner ── */}
@@ -937,6 +945,23 @@ export default function HomeWebScreen() {
           ))}
         </View>
 
+          <View
+            className={`flex-row items-center bg-background border-[1.5px] rounded-lg px-3 h-[38px] gap-2 ${
+              searchFocused ? "border-foreground" : "border-border"
+            }`}
+            style={{ width: isMobile ? 140 : 220 }}
+          >
+            <Ionicons name="search-outline" size={16} color="#757575" />
+            <Input
+              className="flex-1 text-[13px] border-0 h-auto p-0"
+              placeholder={isMobile ? "Search..." : tabPlaceholder}
+              value={query}
+              onChangeText={setQuery}
+              onFocus={() => setSearchFocused(true)}
+              onBlur={() => setSearchFocused(false)}
+              style={{ outlineStyle: "none" } as any}
+            />
+          </View>
         {/* ── Main Content ── */}
         <View className="flex-row pt-8 pb-12 gap-6 self-center w-full" style={{ maxWidth: contentWidth, paddingHorizontal: isMobile ? 12 : 24 }}>
 
