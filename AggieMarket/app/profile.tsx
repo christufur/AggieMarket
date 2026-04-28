@@ -23,7 +23,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useWebSocket } from "@/context/WebSocketContext";
 import { API } from "@/constants/api";
 import { colors } from "@/theme/colors";
-import type { ProfileData, ListingItem, ServiceItem, EventItem } from "@/types";
+import type { ProfileData, ListingItem, ServiceItem, EventItem, RatingItem } from "@/types";
 import { fmtDate, fmtJoined } from "@/lib/utils";
 
 // ── Sub-components ───────────────────────────────────────────────────────────
@@ -45,11 +45,15 @@ export default function ProfileScreen() {
   const { unreadCount } = useWebSocket();
 
   const [profile, setProfile] = useState<ProfileData | null>(null);
-  const [listings, setListings] = useState<ListingItem[]>([]);
+  const [activeListings, setActiveListings] = useState<ListingItem[]>([]);
+  const [soldListings, setSoldListings] = useState<ListingItem[]>([]);
+  const [listingsTab, setListingsTab] = useState<"active" | "sold">("active");
   const [services, setServices] = useState<ServiceItem[]>([]);
   const [events, setEvents] = useState<EventItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [contentTab, setContentTab] = useState<"listings" | "services" | "events">("listings");
+  const [ratings, setRatings] = useState<RatingItem[]>([]);
+  const [ratingsLoading, setRatingsLoading] = useState(false);
 
   const [editOpen, setEditOpen] = useState(false);
   const [editName, setEditName] = useState("");
@@ -59,22 +63,36 @@ export default function ProfileScreen() {
   const fetchProfile = useCallback(async () => {
     if (!user || !token) return;
     try {
-      const [pRes, lRes, sRes, eRes] = await Promise.all([
+      const [pRes, alRes, slRes, sRes, eRes, rRes] = await Promise.all([
         fetch(API.user(user.id), { headers: { Authorization: `Bearer ${token}` } }),
-        fetch(API.userListings(user.id), { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(`${API.userListings(user.id)}?status=active`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(`${API.userListings(user.id)}?status=sold`, { headers: { Authorization: `Bearer ${token}` } }),
         fetch(API.userServices(user.id), { headers: { Authorization: `Bearer ${token}` } }),
         fetch(API.userEvents(user.id), { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(API.userRatings(user.id)),
       ]);
-      const [pData, lData, sData, eData] = await Promise.all([
-        pRes.json(), lRes.json(), sRes.json(), eRes.json(),
+      const [pData, alData, slData, sData, eData, rData] = await Promise.all([
+        pRes.json(), alRes.json(), slRes.json(), sRes.json(), eRes.json(), rRes.json(),
       ]);
       if (pData.user) setProfile(pData.user);
-      if (lData.listings) setListings(lData.listings);
+      if (alData.listings) setActiveListings(alData.listings);
+      if (slData.listings) setSoldListings(slData.listings);
       if (sData.services) setServices(sData.services);
       if (eData.events) setEvents(eData.events);
+      if (rData.ratings) setRatings(rData.ratings);
     } catch (err) { console.error("Profile fetch error:", err); }
     finally { setLoading(false); }
   }, [user, token]);
+
+  const loadMoreRatings = async () => {
+    if (!user) return;
+    setRatingsLoading(true);
+    try {
+      const res = await fetch(`${API.userRatings(user.id)}?limit=20&offset=${ratings.length}`);
+      const data = await res.json();
+      if (data.ratings) setRatings((prev) => [...prev, ...data.ratings]);
+    } finally { setRatingsLoading(false); }
+  };
 
   useEffect(() => { fetchProfile(); }, [fetchProfile]);
 
@@ -104,7 +122,8 @@ export default function ProfileScreen() {
   const deleteListing = async (id: string) => {
     if (!window.confirm("Delete this listing?")) return;
     await fetch(API.listing(id), { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
-    setListings((p) => p.filter((l) => l.id !== id));
+    setActiveListings((p) => p.filter((l) => l.id !== id));
+    setSoldListings((p) => p.filter((l) => l.id !== id));
   };
   const deleteService = async (id: string) => {
     if (!window.confirm("Delete this service?")) return;
@@ -282,7 +301,7 @@ export default function ProfileScreen() {
                     {/* Tab pills */}
                     <View className="flex-row gap-1 px-4 pt-4 pb-3 border-b border-border">
                       {([
-                        { key: "listings" as const, label: "Listings", count: listings.length },
+                        { key: "listings" as const, label: "Listings", count: activeListings.length + soldListings.length },
                         { key: "services" as const, label: "Services", count: services.length },
                         { key: "events" as const, label: "Events", count: events.length },
                       ]).map(({ key, label, count }) => (
@@ -302,43 +321,67 @@ export default function ProfileScreen() {
                     <CardContent className="pt-4">
                       {/* Listings */}
                       {contentTab === "listings" && (
-                        listings.length === 0 ? (
-                          <View className="items-center py-10">
-                            <Ionicons name="pricetag-outline" size={24} color={colors.mid} />
-                            <Text className="text-sm text-muted-foreground mt-2">No listings yet</Text>
-                          </View>
-                        ) : (
-                          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12 }}>
-                            {listings.map((item) => (
-                              <Card key={item.id} className="overflow-hidden transition-shadow hover:shadow-lg">
-                                <Pressable onPress={() => router.push(`/listing/${item.id}`)}>
-                                  {item.image_url ? (
-                                    <Image source={{ uri: API.mediaUrl(item.image_url) }} style={{ width: "100%" as any, height: 120 }} resizeMode="cover" />
-                                  ) : (
-                                    <View className="w-full items-center justify-center bg-muted" style={{ height: 120 }}>
-                                      <Ionicons name="image-outline" size={24} color={colors.mid} />
-                                    </View>
-                                  )}
-                                  <CardContent className="p-3 gap-1">
-                                    <Text className="text-sm font-semibold text-foreground" numberOfLines={1}>{item.title}</Text>
-                                    <View className="flex-row items-center justify-between">
-                                      <Text className="text-sm font-bold" style={{ color: colors.primary }}>
-                                        {item.is_free ? "Free" : item.price != null ? `$${item.price}` : "—"}
-                                      </Text>
-                                      {item.status === "sold" && <Badge variant="destructive"><Text>SOLD</Text></Badge>}
-                                    </View>
-                                  </CardContent>
+                        <View className="gap-3">
+                          {/* Active / Sold sub-tab pills */}
+                          <View className="flex-row gap-1">
+                            {(["active", "sold"] as const).map((tab) => {
+                              const count = tab === "active" ? activeListings.length : soldListings.length;
+                              return (
+                                <Pressable
+                                  key={tab}
+                                  className="px-3 py-1.5 rounded-full border"
+                                  style={listingsTab === tab
+                                    ? { backgroundColor: colors.primaryLight, borderColor: colors.primary }
+                                    : { borderColor: colors.border }}
+                                  onPress={() => setListingsTab(tab)}
+                                >
+                                  <Text className="text-xs font-semibold" style={{ color: listingsTab === tab ? colors.primary : colors.dark }}>
+                                    {tab === "active" ? "Active" : "Sold"} ({count})
+                                  </Text>
                                 </Pressable>
-                                <View className="px-3 pb-2">
-                                  <Pressable className="flex-row items-center gap-1 self-end p-1 rounded hover:bg-muted" onPress={() => deleteListing(item.id)}>
-                                    <Ionicons name="trash-outline" size={13} color={colors.error} />
-                                    <Text className="text-xs" style={{ color: colors.error }}>Delete</Text>
+                              );
+                            })}
+                          </View>
+                          {(listingsTab === "active" ? activeListings : soldListings).length === 0 ? (
+                            <View className="items-center py-10">
+                              <Ionicons name="pricetag-outline" size={24} color={colors.mid} />
+                              <Text className="text-sm text-muted-foreground mt-2">
+                                {listingsTab === "active" ? "No active listings" : "No sold listings"}
+                              </Text>
+                            </View>
+                          ) : (
+                            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12 }}>
+                              {(listingsTab === "active" ? activeListings : soldListings).map((item) => (
+                                <Card key={item.id} className="overflow-hidden transition-shadow hover:shadow-lg">
+                                  <Pressable onPress={() => router.push(`/listing/${item.id}`)}>
+                                    {item.image_url ? (
+                                      <Image source={{ uri: API.mediaUrl(item.image_url) }} style={{ width: "100%" as any, height: 120 }} resizeMode="cover" />
+                                    ) : (
+                                      <View className="w-full items-center justify-center bg-muted" style={{ height: 120 }}>
+                                        <Ionicons name="image-outline" size={24} color={colors.mid} />
+                                      </View>
+                                    )}
+                                    <CardContent className="p-3 gap-1">
+                                      <Text className="text-sm font-semibold text-foreground" numberOfLines={1}>{item.title}</Text>
+                                      <View className="flex-row items-center justify-between">
+                                        <Text className="text-sm font-bold" style={{ color: colors.primary }}>
+                                          {item.is_free ? "Free" : item.price != null ? `$${item.price}` : "—"}
+                                        </Text>
+                                        {item.status === "sold" && <Badge variant="destructive"><Text>SOLD</Text></Badge>}
+                                      </View>
+                                    </CardContent>
                                   </Pressable>
-                                </View>
-                              </Card>
-                            ))}
-                          </div>
-                        )
+                                  <View className="px-3 pb-2">
+                                    <Pressable className="flex-row items-center gap-1 self-end p-1 rounded hover:bg-muted" onPress={() => deleteListing(item.id)}>
+                                      <Ionicons name="trash-outline" size={13} color={colors.error} />
+                                      <Text className="text-xs" style={{ color: colors.error }}>Delete</Text>
+                                    </Pressable>
+                                  </View>
+                                </Card>
+                              ))}
+                            </div>
+                          )}
+                        </View>
                       )}
 
                       {/* Services */}
@@ -471,20 +514,52 @@ export default function ProfileScreen() {
                             </View>
                             <Text className="text-xs text-muted-foreground mt-1">{profile.rating_count} reviews</Text>
                           </View>
-                          {/* Rating distribution bars */}
+                          {/* Rating distribution bars — calculated from fetched ratings */}
                           <View className="flex-1 gap-1.5">
-                            {[5, 4, 3, 2, 1].map((star) => (
-                              <View key={star} className="flex-row items-center gap-2">
-                                <Text className="text-xs text-muted-foreground w-3">{star}</Text>
-                                <Ionicons name="star" size={10} color={colors.primary} />
-                                <View className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-                                  <View className="h-2 rounded-full" style={{ width: "0%", backgroundColor: colors.primary }} />
+                            {[5, 4, 3, 2, 1].map((star) => {
+                              const starCount = ratings.filter((r) => r.stars === star).length;
+                              const pct = ratings.length > 0 ? (starCount / ratings.length) * 100 : 0;
+                              return (
+                                <View key={star} className="flex-row items-center gap-2">
+                                  <Text className="text-xs text-muted-foreground w-3">{star}</Text>
+                                  <Ionicons name="star" size={10} color={colors.primary} />
+                                  <View className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                                    <View className="h-2 rounded-full" style={{ width: `${pct}%`, backgroundColor: colors.primary }} />
+                                  </View>
                                 </View>
-                              </View>
-                            ))}
+                              );
+                            })}
                           </View>
                         </View>
-                        <Text className="text-xs text-muted-foreground text-center">Individual reviews will appear here</Text>
+                        {/* Individual review rows */}
+                        <View className="gap-4">
+                          {ratings.map((r) => (
+                            <View key={r.id} className="gap-1.5 pb-4 border-b border-border last:border-0">
+                              <View className="flex-row items-center justify-between">
+                                <Text className="text-sm font-semibold text-foreground">{r.reviewer_name ?? "Anonymous"}</Text>
+                                <Text className="text-xs text-muted-foreground">{fmtDate(r.created_at)}</Text>
+                              </View>
+                              <View className="flex-row gap-0.5">
+                                {[1, 2, 3, 4, 5].map((i) => (
+                                  <Ionicons
+                                    key={i}
+                                    name={i <= r.stars ? "star" : "star-outline"}
+                                    size={13}
+                                    color={i <= r.stars ? colors.primary : colors.border}
+                                  />
+                                ))}
+                              </View>
+                              {r.body ? (
+                                <Text className="text-sm text-foreground">{r.body}</Text>
+                              ) : null}
+                            </View>
+                          ))}
+                        </View>
+                        {ratings.length >= 20 && (
+                          <Button variant="outline" onPress={loadMoreRatings} disabled={ratingsLoading}>
+                            <Text>{ratingsLoading ? "Loading..." : "Load more"}</Text>
+                          </Button>
+                        )}
                       </View>
                     )}
                   </CardContent>

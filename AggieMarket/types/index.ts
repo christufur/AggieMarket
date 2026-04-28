@@ -51,6 +51,17 @@ export type Message = {
   created_at: string;
 };
 
+export type RatingItem = {
+  id: number;
+  transaction_id: string;
+  reviewer_id: number;
+  reviewee_id: number;
+  stars: number;
+  body: string | null;
+  created_at: string;
+  reviewer_name: string | null;
+};
+
 export type Conversation = {
   id: string;
   listing_id: string | null;

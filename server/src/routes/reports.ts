@@ -1,6 +1,7 @@
 import { Elysia } from "elysia";
 import { jwt } from "@elysiajs/jwt";
 import db from "../db";
+import { requireAuth } from "../utils/auth";
 
 async function requireAdmin(headers: Record<string, string | undefined>, jwtInstance: any) {
   const token = headers.authorization?.replace("Bearer ", "");
@@ -21,14 +22,11 @@ async function requireAdmin(headers: Record<string, string | undefined>, jwtInst
 }
 
 const reportsRoutes = new Elysia()
-  .use(jwt({ name: "jwt", secret: process.env.JWT_SECRET || "secret" }))
+  .use(jwt({ name: "jwt", secret: process.env.JWT_SECRET! }))
 
   .post("/reports", async ({ body, headers, jwt }) => {
-    const token = (headers as any).authorization?.replace("Bearer ", "");
-    if (!token) return { message: "Unauthorized", status: 401 };
-
-    const payload = await jwt.verify(token) as { id: number; email: string } | false;
-    if (!payload) return { message: "Invalid token", status: 401 };
+    const payload = await requireAuth(headers, jwt);
+    if ('status' in payload) return payload;
 
     const { target_type, target_id, reason, description } = body as {
       target_type?: "listing" | "message" | "user";
@@ -44,20 +42,32 @@ const reportsRoutes = new Elysia()
     if (!reason?.trim()) return { message: "reason is required", status: 400 };
 
     const normalizedTargetId = String(target_id);
+    const reporterId = Number(payload.id);
 
     let targetExists = false;
 
     if (target_type === "listing") {
-      targetExists = !!db.query(`
-        SELECT id FROM listings
+      const listing = db.query(`
+        SELECT id, seller_id FROM listings
         WHERE id = ? AND status != 'deleted'
-      `).get(normalizedTargetId);
+      `).get(normalizedTargetId) as { id: string; seller_id: number | string } | null;
+      if (listing && Number(listing.seller_id) === reporterId) {
+        return { message: "You cannot report your own listing", status: 400 };
+      }
+      targetExists = !!listing;
     } else if (target_type === "message") {
-      targetExists = !!db.query(`
-        SELECT id FROM messages
+      const message = db.query(`
+        SELECT id, sender_id FROM messages
         WHERE id = ? AND is_hidden = 0
-      `).get(normalizedTargetId);
+      `).get(normalizedTargetId) as { id: string; sender_id: number } | null;
+      if (message && Number(message.sender_id) === reporterId) {
+        return { message: "You cannot report your own message", status: 400 };
+      }
+      targetExists = !!message;
     } else {
+      if (Number(normalizedTargetId) === reporterId) {
+        return { message: "You cannot report yourself", status: 400 };
+      }
       targetExists = !!db.query(`
         SELECT id FROM users
         WHERE id = ?
@@ -70,7 +80,7 @@ const reportsRoutes = new Elysia()
       INSERT INTO reports (reporter_id, target_type, target_id, reason, description)
       VALUES (?, ?, ?, ?, ?)
     `, [
-      payload.id,
+      reporterId,
       target_type,
       normalizedTargetId,
       reason.trim(),

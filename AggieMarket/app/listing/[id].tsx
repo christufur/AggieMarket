@@ -49,6 +49,19 @@ export default function ListingDetailScreenWeb() {
   const [msgSending, setMsgSending] = useState(false);
   const [msgError, setMsgError] = useState("");
 
+  // Mark as Sold state
+  const [soldOpen, setSoldOpen] = useState(false);
+  const [soldBuyerId, setSoldBuyerId] = useState("");
+  const [soldSaving, setSoldSaving] = useState(false);
+
+  // Report state
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportReason, setReportReason] = useState("");
+  const [reportSubmitted, setReportSubmitted] = useState(false);
+  const [reportSending, setReportSending] = useState(false);
+
+  const REPORT_REASONS = ["Spam", "Inappropriate", "Counterfeit", "Other"];
+
   useEffect(() => {
     if (!id) return;
     fetch(API.listing(id))
@@ -130,6 +143,40 @@ export default function ListingDetailScreenWeb() {
     setEditCategory(listing.category);
     setEditCondition(listing.condition ?? "");
     setEditOpen(true);
+  };
+
+  const handleMarkSold = async () => {
+    if (!token || !listing) return;
+    setSoldSaving(true);
+    try {
+      const parsedBuyerId = soldBuyerId.trim() ? parseInt(soldBuyerId.trim(), 10) : null;
+      const res = await fetch(API.markSold(listing.id), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ buyer_id: parsedBuyerId ?? null }),
+      });
+      if (res.ok) {
+        setListing((prev) => prev ? { ...prev, status: "sold" } : prev);
+        setSoldOpen(false);
+        setSoldBuyerId("");
+      }
+    } finally { setSoldSaving(false); }
+  };
+
+  const handleReport = async () => {
+    if (!token || !listing || !reportReason) return;
+    setReportSending(true);
+    try {
+      const res = await fetch(API.reports, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ target_type: "listing", target_id: listing.id, reason: reportReason, description: "" }),
+      });
+      if (res.ok) {
+        setReportSubmitted(true);
+        setReportOpen(false);
+      }
+    } finally { setReportSending(false); }
   };
 
   const handleEditSave = async () => {
@@ -318,7 +365,12 @@ export default function ListingDetailScreenWeb() {
               <CardHeader className="gap-3">
                 <View className="flex-row items-start justify-between gap-3">
                   <CardTitle className="flex-1">
-                    <Text>{listing.title}</Text>
+                    <View className="flex-row items-center gap-2 flex-wrap">
+                      <Text>{listing.title}</Text>
+                      {listing.status === "sold" && (
+                        <Badge variant="destructive"><Text>SOLD</Text></Badge>
+                      )}
+                    </View>
                   </CardTitle>
                   <Text
                     className="font-bold text-foreground"
@@ -373,26 +425,34 @@ export default function ListingDetailScreenWeb() {
                 </View>
 
                 {isOwner ? (
-                  <View className="flex-row items-center gap-3 mt-2">
-                    <Button variant="outline" className="flex-1" onPress={openEdit}>
-                      <Ionicons name="create-outline" size={16} color={colors.ink} />
-                      <Text className="ml-2 text-sm font-semibold text-foreground">Edit</Text>
-                    </Button>
-                    <Button
-                      variant="destructive"
-                      className="flex-1"
-                      onPress={async () => {
-                        if (!window.confirm("Are you sure you want to delete this listing?")) return;
-                        await fetch(API.listing(listing.id), {
-                          method: "DELETE",
-                          headers: { Authorization: `Bearer ${token}` },
-                        });
-                        router.back();
-                      }}
-                    >
-                      <Ionicons name="trash-outline" size={16} color={colors.white} />
-                      <Text className="ml-2 text-sm font-semibold text-destructive-foreground">Delete</Text>
-                    </Button>
+                  <View className="gap-3 mt-2">
+                    <View className="flex-row items-center gap-3">
+                      <Button variant="outline" className="flex-1" onPress={openEdit}>
+                        <Ionicons name="create-outline" size={16} color={colors.ink} />
+                        <Text className="ml-2 text-sm font-semibold text-foreground">Edit</Text>
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        className="flex-1"
+                        onPress={async () => {
+                          if (!window.confirm("Are you sure you want to delete this listing?")) return;
+                          await fetch(API.listing(listing.id), {
+                            method: "DELETE",
+                            headers: { Authorization: `Bearer ${token}` },
+                          });
+                          router.back();
+                        }}
+                      >
+                        <Ionicons name="trash-outline" size={16} color={colors.white} />
+                        <Text className="ml-2 text-sm font-semibold text-destructive-foreground">Delete</Text>
+                      </Button>
+                    </View>
+                    {listing.status === "active" && (
+                      <Button variant="outline" onPress={() => setSoldOpen(true)}>
+                        <Ionicons name="checkmark-circle-outline" size={16} color={colors.ink} />
+                        <Text className="ml-2 text-sm font-semibold text-foreground">Mark as Sold</Text>
+                      </Button>
+                    )}
                   </View>
                 ) : (
                   <View className="gap-3 mt-2">
@@ -430,6 +490,39 @@ export default function ListingDetailScreenWeb() {
                         <Ionicons name={saved ? "heart" : "heart-outline"} size={22} color={colors.primary} />
                       </Pressable>
                     </View>
+                    <View className="items-start">
+                      {reportSubmitted ? (
+                        <Text className="text-xs text-muted-foreground">Report submitted.</Text>
+                      ) : reportOpen ? (
+                        <View className="gap-2 w-full">
+                          <Text className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Report reason</Text>
+                          <View className="flex-row gap-2 flex-wrap">
+                            {REPORT_REASONS.map((r) => (
+                              <Pressable
+                                key={r}
+                                onPress={() => setReportReason(r)}
+                                className="px-3 py-1.5 rounded-full border"
+                                style={reportReason === r ? { backgroundColor: colors.primaryLight, borderColor: colors.primary } : { borderColor: colors.border }}
+                              >
+                                <Text className="text-xs font-semibold" style={{ color: reportReason === r ? colors.primary : colors.dark }}>{r}</Text>
+                              </Pressable>
+                            ))}
+                          </View>
+                          <View className="flex-row gap-2">
+                            <Button variant="outline" onPress={() => { setReportOpen(false); setReportReason(""); }}>
+                              <Text className="text-xs">Cancel</Text>
+                            </Button>
+                            <Button onPress={handleReport} disabled={!reportReason || reportSending}>
+                              <Text className="text-xs text-primary-foreground">{reportSending ? "Sending..." : "Submit"}</Text>
+                            </Button>
+                          </View>
+                        </View>
+                      ) : (
+                        <Pressable onPress={() => setReportOpen(true)}>
+                          <Text className="text-xs text-muted-foreground underline">Report listing</Text>
+                        </Pressable>
+                      )}
+                    </View>
                   </View>
                 )}
               </CardContent>
@@ -437,6 +530,35 @@ export default function ListingDetailScreenWeb() {
           </View>
         </View>
       </View>
+      {/* Mark as Sold Dialog */}
+      <Dialog open={soldOpen} onOpenChange={setSoldOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle><Text>Mark as Sold</Text></DialogTitle>
+          </DialogHeader>
+          <View className="gap-4">
+            <Text className="text-sm text-muted-foreground">This will mark the listing as sold and create a transaction record.</Text>
+            <View className="gap-1.5">
+              <Text className="text-sm font-medium text-foreground">Buyer's user ID (optional)</Text>
+              <Input
+                value={soldBuyerId}
+                onChangeText={setSoldBuyerId}
+                placeholder="e.g. 42"
+                keyboardType="numeric"
+              />
+            </View>
+          </View>
+          <DialogFooter>
+            <Button variant="outline" onPress={() => { setSoldOpen(false); setSoldBuyerId(""); }}>
+              <Text>Cancel</Text>
+            </Button>
+            <Button onPress={handleMarkSold} disabled={soldSaving}>
+              <Text className="text-primary-foreground">{soldSaving ? "Saving..." : "Confirm"}</Text>
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Edit Listing Dialog */}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent className="max-w-lg">

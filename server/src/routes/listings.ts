@@ -224,11 +224,8 @@ const listingsRoutes = new Elysia()
     })
 
     .post("/listings/:id/mark-sold", async ({ params, body, headers, jwt }) => {
-        const token = (headers as any).authorization?.replace("Bearer ", "");
-        if (!token) return { message: "Unauthorized", status: 401 };
-
-        const payload = await jwt.verify(token) as { id: number; email: string } | false;
-        if (!payload) return { message: "Invalid token", status: 401 };
+        const payload = await requireAuth(headers, jwt);
+        if ('status' in payload) return payload;
 
         const listing = db.query(`
             SELECT id, seller_id, status

@@ -1,16 +1,14 @@
 import { Elysia } from "elysia";
 import { jwt } from "@elysiajs/jwt";
 import db from "../db";
+import { requireAuth } from "../utils/auth";
 
 const ratingsRoutes = new Elysia()
-  .use(jwt({ name: "jwt", secret: process.env.JWT_SECRET || "secret" }))
+  .use(jwt({ name: "jwt", secret: process.env.JWT_SECRET! }))
 
   .post("/ratings", async ({ body, headers, jwt }) => {
-    const token = (headers as any).authorization?.replace("Bearer ", "");
-    if (!token) return { message: "Unauthorized", status: 401 };
-
-    const payload = await jwt.verify(token) as { id: number; email: string } | false;
-    if (!payload) return { message: "Invalid token", status: 401 };
+    const payload = await requireAuth(headers, jwt);
+    if ('status' in payload) return payload;
 
     const { transaction_id, stars, body: reviewBody } = body as {
       transaction_id?: string;
