@@ -37,14 +37,24 @@ const usersRoutes = new Elysia()
     };
   })
 
-  .get("/users/:id/listings", ({ params }) => {
+  .get("/users/:id/listings", ({ params, query }) => {
+    const requestedStatus = (query as { status?: string }).status;
+
+    let statusCondition = "l.status IN ('active', 'sold')";
+    const bindings: Array<string | number> = [params.id];
+
+    if (requestedStatus === "active" || requestedStatus === "sold") {
+      statusCondition = "l.status = ?";
+      bindings.push(requestedStatus);
+    }
+
     const listings = db.query(`
       SELECT l.*,
              (SELECT s3_url FROM listing_images WHERE listing_id = l.id ORDER BY sort_order ASC LIMIT 1) AS image_url
       FROM listings l
-      WHERE seller_id = ? AND status IN ('active', 'sold')
-      ORDER BY created_at DESC
-    `).all(params.id);
+      WHERE l.seller_id = ? AND ${statusCondition}
+      ORDER BY l.created_at DESC
+    `).all(...bindings);
 
     return { listings, status: 200 };
   })

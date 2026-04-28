@@ -16,6 +16,7 @@ export const API = {
   me: `${BASE}/auth/me`,
   listings: `${BASE}/listings`,
   listingsPopular: (limit = 10) => `${BASE}/listings/popular?limit=${limit}`,
+  search: `${BASE}/search`,
   listing: (id: string) => `${BASE}/listings/${id}`,
   listingImages: (id: string) => `${BASE}/listings/${id}/images`,
   services: `${BASE}/services`,

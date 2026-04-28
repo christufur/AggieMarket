@@ -13,6 +13,8 @@ import usersRoutes from "./src/routes/users";
 import conversationsRoutes from "./src/routes/conversations";
 import wsRoutes from "./src/routes/ws";
 import savedRoutes from "./src/routes/saved";
+import ratingsRoutes from "./src/routes/ratings";
+import reportsRoutes from "./src/routes/reports";
 
 
 const app = new Elysia()
@@ -26,6 +28,8 @@ const app = new Elysia()
   .use(conversationsRoutes)
   .use(wsRoutes)
   .use(savedRoutes)
+  .use(ratingsRoutes)
+  .use(reportsRoutes)
   .get("/", () => ({ status: "AggieMarket API running" }))
   .listen(Number(process.env.PORT) || 3000);
 
