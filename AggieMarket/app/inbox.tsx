@@ -220,6 +220,98 @@ function MessageBubble({ msg, isMine }: { msg: OptimisticMessage; isMine: boolea
   );
 }
 
+// ─── Reportable Message ──────────────────────────────────────────────────────
+
+const REPORT_REASONS = ["Spam", "Harassment", "Inappropriate content", "Other"];
+
+function ReportableMessage({
+  msg, isReported, isShowingMenu, reportSubmitting, onOpenMenu, onReport, onDismiss,
+}: {
+  msg: OptimisticMessage;
+  isReported: boolean;
+  isShowingMenu: boolean;
+  reportSubmitting: boolean;
+  onOpenMenu: () => void;
+  onReport: (msgId: string, reason: string) => void;
+  onDismiss: () => void;
+}) {
+  const [hovered, setHovered] = useState(false);
+
+  return (
+    <View
+      style={{ marginBottom: 8 }}
+      // @ts-ignore — web-only event
+      onMouseEnter={() => setHovered(true)}
+      // @ts-ignore — web-only event
+      onMouseLeave={() => setHovered(false)}
+    >
+      <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 4 }}>
+        {/* Message bubble */}
+        <View style={{ flex: 1 }}>
+          <MessageBubble msg={msg} isMine={false} />
+        </View>
+        {/* Flag button — show on hover or when menu is open */}
+        {(hovered || isShowingMenu) && !isReported && (
+          <Pressable
+            onPress={onOpenMenu}
+            style={{
+              width: 24, height: 24, borderRadius: 12,
+              alignItems: "center", justifyContent: "center",
+              backgroundColor: isShowingMenu ? colors.bg : "transparent",
+              cursor: "pointer" as any,
+              flexShrink: 0,
+              marginBottom: 24,
+            }}
+          >
+            <Ionicons name="flag-outline" size={13} color={isShowingMenu ? colors.error : colors.mid} />
+          </Pressable>
+        )}
+        {isReported && (
+          <View style={{ paddingBottom: 24, paddingHorizontal: 4 }}>
+            <Text style={{ fontSize: 10, color: colors.mid }}>Reported</Text>
+          </View>
+        )}
+      </View>
+
+      {/* Reason menu */}
+      {isShowingMenu && (
+        <View style={{
+          marginLeft: 8, marginTop: 4, marginBottom: 4,
+          backgroundColor: "#fff", borderRadius: 10,
+          borderWidth: 1, borderColor: colors.border,
+          shadowColor: "#000", shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.08, shadowRadius: 8,
+          overflow: "hidden", alignSelf: "flex-start", minWidth: 180,
+        }}>
+          <View style={{ paddingHorizontal: 12, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+            <Text style={{ fontSize: 11, fontWeight: "600", color: colors.dark }}>Report message</Text>
+          </View>
+          {REPORT_REASONS.map((reason) => (
+            <Pressable
+              key={reason}
+              onPress={() => !reportSubmitting && onReport(msg.id, reason)}
+              style={({ pressed }) => ({
+                paddingHorizontal: 12, paddingVertical: 9,
+                backgroundColor: pressed ? colors.bg : "#fff",
+                cursor: "pointer" as any,
+                opacity: reportSubmitting ? 0.5 : 1,
+              })}
+            >
+              <Text style={{ fontSize: 13, color: colors.ink }}>{reason}</Text>
+            </Pressable>
+          ))}
+          <Pressable
+            onPress={onDismiss}
+            style={{ paddingHorizontal: 12, paddingVertical: 8, borderTopWidth: 1, borderTopColor: colors.border, cursor: "pointer" as any }}
+          >
+            <Text style={{ fontSize: 12, color: colors.dark, fontWeight: "500" }}>Cancel</Text>
+          </Pressable>
+        </View>
+      )}
+    </View>
+  );
+}
+
 // ─── Chat Panel ──────────────────────────────────────────────────────────────
 
 function ChatPanel({ conversation, token, userId }: {
@@ -235,6 +327,10 @@ function ChatPanel({ conversation, token, userId }: {
   const scrollRef = useRef<ScrollView>(null);
   const { subscribe, send } = useWebSocket();
   const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const [reportMsgId, setReportMsgId] = useState<string | null>(null);
+  const [reportSubmitting, setReportSubmitting] = useState(false);
+  const [reportedMsgIds, setReportedMsgIds] = useState<Set<string>>(new Set());
 
   // Fetch messages
   useEffect(() => {
@@ -352,6 +448,23 @@ function ChatPanel({ conversation, token, userId }: {
     send({ type: "typing", conversationId: conversation.id });
   };
 
+  const handleReport = async (msgId: string, reason: string) => {
+    setReportSubmitting(true);
+    try {
+      await fetch(API.reports, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ target_type: "message", target_id: msgId, reason }),
+      });
+      setReportedMsgIds((prev) => new Set([...prev, msgId]));
+    } catch {
+      // silent fail — don't crash the chat
+    } finally {
+      setReportSubmitting(false);
+      setReportMsgId(null);
+    }
+  };
+
   return (
     <View style={{ flex: 1, flexDirection: "column" }}>
       {/* Chat header */}
@@ -457,21 +570,41 @@ function ChatPanel({ conversation, token, userId }: {
               <Text style={{ fontSize: 13, color: "#bbb" }}>No messages yet. Say hello!</Text>
             </View>
           ) : (
-            messages.map((msg) => (
-              <View key={msg.id}>
-                <MessageBubble msg={msg} isMine={msg.sender_id === userId} />
-                {msg._status === 'failed' && msg.sender_id === userId && (
-                  <Pressable
-                    onPress={() => retryMessage(msg as OptimisticMessage)}
-                    style={{ alignSelf: 'flex-end', paddingHorizontal: 8, paddingBottom: 6 }}
-                  >
-                    <Text style={{ fontSize: 11, color: colors.error, fontWeight: '500', cursor: 'pointer' as any }}>
-                      Tap to retry
-                    </Text>
-                  </Pressable>
-                )}
-              </View>
-            ))
+            messages.map((msg) => {
+              const isMine = msg.sender_id === userId;
+              const isReported = reportedMsgIds.has(msg.id);
+              const isShowingMenu = reportMsgId === msg.id;
+
+              return (
+                <View key={msg.id}>
+                  {!isMine ? (
+                    <ReportableMessage
+                      msg={msg}
+                      isReported={isReported}
+                      isShowingMenu={isShowingMenu}
+                      reportSubmitting={reportSubmitting}
+                      onOpenMenu={() => setReportMsgId(isShowingMenu ? null : msg.id)}
+                      onReport={handleReport}
+                      onDismiss={() => setReportMsgId(null)}
+                    />
+                  ) : (
+                    <View>
+                      <MessageBubble msg={msg} isMine={true} />
+                      {msg._status === 'failed' && (
+                        <Pressable
+                          onPress={() => retryMessage(msg as OptimisticMessage)}
+                          style={{ alignSelf: 'flex-end', paddingHorizontal: 8, paddingBottom: 6 }}
+                        >
+                          <Text style={{ fontSize: 11, color: colors.error, fontWeight: '500', cursor: 'pointer' as any }}>
+                            Tap to retry
+                          </Text>
+                        </Pressable>
+                      )}
+                    </View>
+                  )}
+                </View>
+              );
+            })
           )}
         </ScrollView>
       )}
