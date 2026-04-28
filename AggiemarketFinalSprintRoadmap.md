@@ -293,7 +293,7 @@ ssh ec2  →  cd /path/to/server  →  bun scripts/seed.ts
 **Genesis — frontend:** ✅ done Apr 28
 
 - ✅ `listing/[id].tsx`: "Report listing" inline flow for non-owners — reason picker (Spam / Inappropriate / Counterfeit / Other), `POST /reports`, inline "Report submitted" confirmation.
-- [ ] "Report message" long-press in chat thread — still pending.
+- ✅ `inbox.tsx`: "Report message" — hover reveals flag icon on non-mine bubbles, inline reason dropdown (Spam / Harassment / Inappropriate content / Other), POST /reports, shows "Reported" label on success.
 
 **Christopher — frontend:** ✅ done Apr 28
 
@@ -307,7 +307,6 @@ ssh ec2  →  cd /path/to/server  →  bun scripts/seed.ts
 - [x] Resolving a listing report soft-deletes it and removes from public views.
 - [x] Dismissing marks dismissed without touching the target.
 - [ ] Demo end-to-end using seeded admin account — pending production deploy.
-- [ ] "Report message" in chat thread — still pending.
 
 ---
 
