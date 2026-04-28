@@ -22,13 +22,13 @@ A fresh user installs AggieMarket from TestFlight, registers with `@nmsu.edu`, b
 | Task                               | Christopher                      | Genesis         | Demetrius        |
 | ---------------------------------- | -------------------------------- | --------------- | ---------------- |
 | TASK-1 Home screen real data       | ✅ Backend endpoints done        | Frontend wiring | —                |
-| TASK-2 FTS5 search                 | —                                | Frontend wiring | Backend (finish) |
-| TASK-3 Client WebSocket            | —                                | All             | —                |
+| TASK-2 FTS5 search                 |  🔄 In progress (backend done)   | Frontend wiring | Backend (finish) |
+| TASK-3 Client WebSocket            | 🔄 In progress (backend done)    | All             | —                |
 | TASK-4 TestFlight build            | 🔄 In progress (enrollment)      | —               | —                |
 | TASK-5 APNs push                   | ✅ Backend done / frontend next  | —               | —                |
 | TASK-6 Seed data                   | ✅ Script ready (run on prod)    | —               | —                |
-| TASK-7 Reviews and Ratings         | —                                | Frontend        | Backend          |
-| TASK-8 Mark as Sold + profile tabs | —                                | Frontend        | Backend          |
+| TASK-7 Reviews and Ratings         | 🔄 In progress (backend done)    | Frontend        | Backend          |
+| TASK-8 Mark as Sold + profile tabs | 🔄 In progress (backend done)   | Frontend        | Backend          |
 | TASK-9 Admin and moderation        | Admin dashboard frontend         | Report button   | Backend          |
 | TASK-10 Bug sweep                  | Coordinator                      | Frontend pass   | Backend pass     |
 
