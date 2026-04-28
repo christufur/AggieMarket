@@ -21,9 +21,9 @@ A fresh user installs AggieMarket from TestFlight, registers with `@nmsu.edu`, b
 
 | Task                               | Christopher                      | Genesis         | Demetrius        |
 | ---------------------------------- | -------------------------------- | --------------- | ---------------- |
-| TASK-1 Home screen real data       | ✅ Backend endpoints done        | Frontend wiring | —                |
-| TASK-2 FTS5 search                 | —                                | Frontend wiring | ✅ Backend done  |
-| TASK-3 Client WebSocket            | —                                | All             | —                |
+| TASK-1 Home screen real data       | ✅ Backend endpoints done        | ✅ Frontend done | —               |
+| TASK-2 FTS5 search                 | —                                | ✅ Frontend done | ✅ Backend done  |
+| TASK-3 Client WebSocket            | —                                | ✅ Done         | —                |
 | TASK-4 TestFlight build            | 🔄 In progress (enrollment)      | —               | —                |
 | TASK-5 APNs push                   | ✅ Backend done / frontend next  | —               | —                |
 | TASK-6 Seed data                   | ✅ Script ready (run on prod)    | —               | —                |
@@ -56,10 +56,10 @@ A fresh user installs AggieMarket from TestFlight, registers with `@nmsu.edu`, b
 
 **Acceptance:**
 
-- [x] Home screen renders zero hardcoded data. *(already true — home.tsx fetches live)*
-- [ ] All three strips render from the API in dev and production.
-- [ ] Killing the backend shows the error state, not a crash.
-- [ ] Tapping a card still navigates to detail (regression check).
+- [x] Home screen renders zero hardcoded data.
+- [x] All three strips render from the API (skeleton cards while loading).
+- [x] Killing the backend shows error state with retry button, not a crash.
+- [x] Tapping a card navigates to detail.
 
 ---
 
@@ -82,12 +82,20 @@ A fresh user installs AggieMarket from TestFlight, registers with `@nmsu.edu`, b
 - Wire the category chips to the `category` param.
 - Render results using `CardV`.
 
+**Genesis — frontend:** ✅ done Apr 28 (built into home.tsx)
+
+- ✅ Search input in nav bar with 200ms debounce, hits `GET /search` FTS5 endpoint.
+- ✅ Category sidebar chips filter live via `category=` param.
+- ✅ Condition filter for listings via `condition=` param.
+- ✅ Skeleton loading while search results fetch.
+- ✅ Zero-results empty state with post prompt.
+
 **Acceptance:**
 
-- [ ] Typing "calc" returns listings with "calculus" in the title or description.
-- [ ] Category chips filter live.
-- [ ] Empty query with a category still returns results.
-- [ ] Zero-results empty state.
+- [x] Typing "calc" returns listings with "calculus" in title or description.
+- [x] Category chips filter live.
+- [x] Empty query with category still returns results.
+- [x] Zero-results empty state.
 
 ---
 
@@ -106,11 +114,21 @@ A fresh user installs AggieMarket from TestFlight, registers with `@nmsu.edu`, b
 - Optimistic UI: messages appear immediately on send in a "sending" state, update on server ACK.
 - Update inbox unread counts when a WS message arrives for a conversation not currently open.
 
+**Status:** ✅ done Apr 28
+
+- ✅ `WebSocketContext.tsx` — global WS client with auto-connect, exponential backoff (1s→30s), subscribe/send API.
+- ✅ `ChatPanel` in `inbox.tsx` subscribes to `new_message` and `typing` WS events on mount, unsubscribes on unmount.
+- ✅ Optimistic UI: message appears immediately at opacity 0.65 (`_status:'sending'`), replaced by real message on server ACK.
+- ✅ Failed messages show "Failed" label + "Tap to retry" pressable that restores text to input.
+- ✅ WS dedup guard prevents double-append when server also sends `new_message` event.
+- ✅ Unread badges in nav update live on new messages.
+- ✅ Conversation list refreshes on new WS message.
+
 **Acceptance:**
 
-- [ ] Two browser tabs as different users can message each other with < 1s latency.
-- [ ] Dropping and restoring wifi auto-reconnects.
-- [ ] Unread badges update live in the inbox.
+- [x] Two browser tabs can message with <1s latency (WS push, not polling).
+- [x] Dropping wifi auto-reconnects with exponential backoff.
+- [x] Unread badges update live in inbox.
 
 ---
 
