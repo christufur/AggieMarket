@@ -143,6 +143,19 @@ function Toast({ message, visible }: { message: string; visible: boolean }) {
 
 // ─── Cards ────────────────────────────────────────────────────────────────────
 
+function SkeletonCard() {
+  return (
+    <View style={{ borderRadius: 12, overflow: "hidden", backgroundColor: "#fff", borderWidth: 1, borderColor: colors.border }}>
+      <View style={{ height: 208, backgroundColor: colors.bg }} />
+      <View style={{ padding: 16, gap: 10 }}>
+        <View style={{ height: 14, width: "70%", backgroundColor: colors.bg, borderRadius: 6 }} />
+        <View style={{ height: 12, width: "40%", backgroundColor: colors.bg, borderRadius: 6 }} />
+        <View style={{ height: 20, width: "30%", backgroundColor: colors.bg, borderRadius: 6 }} />
+      </View>
+    </View>
+  );
+}
+
 const ListingCard = memo(function ListingCard({ item }: { item: Listing }) {
   const router = useRouter();
   const [hovered, setHovered] = useState(false);
@@ -764,11 +777,21 @@ export default function HomeWebScreen() {
   const [toastVisible, setToastVisible] = useState(false);
   const [toastMessage, setToastMessage] = useState("Posted!");
   const [searchFocused, setSearchFocused] = useState(false);
+  const [loadingListings, setLoadingListings] = useState(true);
+  const [loadingServices, setLoadingServices] = useState(true);
+  const [loadingEvents, setLoadingEvents] = useState(true);
+  const [errorListings, setErrorListings] = useState(false);
+  const [errorServices, setErrorServices] = useState(false);
+  const [errorEvents, setErrorEvents] = useState(false);
 
   const fetchListings = useCallback(() => {
+    setLoadingListings(true);
+    setErrorListings(false);
     fetch(API.listings)
       .then((r) => r.json())
-      .then((d) => { if (d.listings) setListings(d.listings); });
+      .then((d) => { if (d.listings) setListings(d.listings); })
+      .catch(() => setErrorListings(true))
+      .finally(() => setLoadingListings(false));
   }, []);
 
   const fetchListingResults = useCallback((searchQuery: string, category: string | null, condition: string | null) => {
@@ -782,24 +805,34 @@ export default function HomeWebScreen() {
 
     const url = params.toString() ? `${API.search}?${params.toString()}` : API.search;
 
+    setLoadingListings(true);
     fetch(url)
       .then((r) => r.json())
       .then((d) => { if (d.listings) setListingResults(d.listings); })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setLoadingListings(false));
   }, []);
 
   const fetchServices = useCallback(() => {
     if (!token) return;
+    setLoadingServices(true);
+    setErrorServices(false);
     fetch(API.services, { headers: { Authorization: `Bearer ${token}` } })
       .then((r) => r.json())
-      .then((d) => { if (d.services) setServices(d.services); });
+      .then((d) => { if (d.services) setServices(d.services); })
+      .catch(() => setErrorServices(true))
+      .finally(() => setLoadingServices(false));
   }, [token]);
 
   const fetchEvents = useCallback(() => {
     if (!token) return;
+    setLoadingEvents(true);
+    setErrorEvents(false);
     fetch(API.events, { headers: { Authorization: `Bearer ${token}` } })
       .then((r) => r.json())
-      .then((d) => { if (d.events) setEvents(d.events); });
+      .then((d) => { if (d.events) setEvents(d.events); })
+      .catch(() => setErrorEvents(true))
+      .finally(() => setLoadingEvents(false));
   }, [token]);
 
   useEffect(() => {
@@ -864,6 +897,21 @@ export default function HomeWebScreen() {
     activeTab === "listing" ? filteredListings.length :
     activeTab === "service" ? filteredServices.length :
     filteredEvents.length;
+
+  const isLoading =
+    activeTab === "listing" ? loadingListings :
+    activeTab === "service" ? loadingServices :
+    loadingEvents;
+
+  const hasError =
+    activeTab === "listing" ? errorListings :
+    activeTab === "service" ? errorServices :
+    errorEvents;
+
+  const retryFetch =
+    activeTab === "listing" ? fetchListings :
+    activeTab === "service" ? fetchServices :
+    fetchEvents;
 
   const isMobile = width < 768;
   const SIDEBAR = isMobile ? 0 : 220;
@@ -959,7 +1007,7 @@ export default function HomeWebScreen() {
                   Marketplace
                 </Text>
                 <Text className="text-sm" style={{ color: "rgba(255,255,255,0.6)" }}>
-                  {listings.length} listings · {services.length} services · {events.length} events
+                  {loadingListings ? "—" : listings.length} listings · {loadingServices ? "—" : services.length} services · {loadingEvents ? "—" : events.length} events
                 </Text>
               </View>
             </View>
@@ -1047,7 +1095,20 @@ export default function HomeWebScreen() {
               <Text className="text-[13px] text-muted-foreground">{currentCount} result{currentCount !== 1 ? "s" : ""}</Text>
             </View>
 
-            {currentCount === 0 ? (
+            {isLoading ? (
+              <div style={{ display: "grid", gridTemplateColumns: `repeat(${gridCols}, 1fr)`, gap: 16 }}>
+                {[1, 2, 3, 4, 5, 6].map((i) => <SkeletonCard key={i} />)}
+              </div>
+            ) : hasError ? (
+              <View className="items-center py-20 gap-4">
+                <Ionicons name="cloud-offline-outline" size={40} color={colors.mid} />
+                <Text className="text-base font-semibold text-foreground">Could not load data</Text>
+                <Text className="text-sm text-muted-foreground">Check your connection and try again.</Text>
+                <Button variant="outline" onPress={retryFetch} className="mt-2">
+                  <Text className="text-sm font-semibold">Retry</Text>
+                </Button>
+              </View>
+            ) : currentCount === 0 ? (
               <View className="items-center py-20 gap-3">
                 <Text className="text-[40px] text-border">{"\u25ce"}</Text>
                 <Text className="text-lg font-bold text-foreground">{emptyNoResultMsg}</Text>

@@ -166,7 +166,9 @@ function NoConversationSelected() {
 
 // ─── Message Bubble ──────────────────────────────────────────────────────────
 
-function MessageBubble({ msg, isMine }: { msg: Message; isMine: boolean }) {
+type OptimisticMessage = Message & { _status?: 'sending' | 'failed'; _tempId?: string };
+
+function MessageBubble({ msg, isMine }: { msg: OptimisticMessage; isMine: boolean }) {
   return (
     <View style={{
       alignSelf: isMine ? "flex-end" : "flex-start",
@@ -175,6 +177,7 @@ function MessageBubble({ msg, isMine }: { msg: Message; isMine: boolean }) {
     }}>
       <View style={{
         backgroundColor: isMine ? colors.primary : "#fff",
+        opacity: msg._status === 'sending' ? 0.65 : 1,
         borderRadius: 16,
         borderBottomRightRadius: isMine ? 4 : 16,
         borderBottomLeftRadius: isMine ? 16 : 4,
@@ -206,6 +209,12 @@ function MessageBubble({ msg, isMine }: { msg: Message; isMine: boolean }) {
             {msg.read_at ? "\u2713\u2713 Read" : "\u2713 Sent"}
           </Text>
         )}
+        {isMine && msg._status === 'sending' && (
+          <Text style={{ fontSize: 9, color: "#ccc" }}>Sending…</Text>
+        )}
+        {isMine && msg._status === 'failed' && (
+          <Text style={{ fontSize: 9, color: colors.error, fontWeight: "600" }}>Failed</Text>
+        )}
       </View>
     </View>
   );
@@ -217,7 +226,7 @@ function ChatPanel({ conversation, token, userId }: {
   conversation: Conversation; token: string; userId: number;
 }) {
   const router = useRouter();
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<OptimisticMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -249,7 +258,12 @@ function ChatPanel({ conversation, token, userId }: {
   useEffect(() => {
     const unsub = subscribe("new_message", (payload) => {
       if (payload.conversationId === conversation.id && payload.message) {
-        setMessages((prev) => [...prev, payload.message as Message]);
+        const incoming = payload.message as Message;
+        setMessages((prev) => {
+          // Avoid duplicates — real message might already be there from HTTP response
+          if (prev.some((m) => m.id === incoming.id)) return prev;
+          return [...prev, incoming];
+        });
         // Mark as read since we're viewing this conversation
         fetch(API.conversationRead(conversation.id), {
           method: "PATCH",
@@ -283,8 +297,24 @@ function ChatPanel({ conversation, token, userId }: {
   const sendMessage = async () => {
     const text = input.trim();
     if (!text || sending) return;
-    setSending(true);
+
+    const tempId = `temp-${Date.now()}`;
+    const optimisticMsg: OptimisticMessage = {
+      id: tempId,
+      _tempId: tempId,
+      _status: 'sending',
+      conversation_id: conversation.id,
+      sender_id: userId,
+      content: text,
+      sender_name: '',
+      read_at: null,
+      created_at: new Date().toISOString(),
+    };
+
+    setMessages((prev) => [...prev, optimisticMsg]);
     setInput("");
+    setSending(true);
+
     try {
       const res = await fetch(API.conversationMessages(conversation.id), {
         method: "POST",
@@ -293,13 +323,28 @@ function ChatPanel({ conversation, token, userId }: {
       });
       const data = await res.json();
       if (data.message) {
-        setMessages((prev) => [...prev, data.message]);
+        // Replace optimistic message with real one
+        setMessages((prev) =>
+          prev.map((m) => m._tempId === tempId ? { ...data.message } : m)
+        );
       }
     } catch {
+      // Mark as failed
+      setMessages((prev) =>
+        prev.map((m) => m._tempId === tempId ? { ...m, _status: 'failed' } : m)
+      );
       setSendError("Failed to send");
       setTimeout(() => setSendError(""), 3000);
+    } finally {
+      setSending(false);
     }
-    finally { setSending(false); }
+  };
+
+  const retryMessage = async (failedMsg: OptimisticMessage) => {
+    // Remove the failed message
+    setMessages((prev) => prev.filter((m) => m._tempId !== failedMsg._tempId));
+    // Re-send by setting input and calling send
+    setInput(failedMsg.content);
   };
 
   const handleInputChange = (text: string) => {
@@ -413,7 +458,19 @@ function ChatPanel({ conversation, token, userId }: {
             </View>
           ) : (
             messages.map((msg) => (
-              <MessageBubble key={msg.id} msg={msg} isMine={msg.sender_id === userId} />
+              <View key={msg.id}>
+                <MessageBubble msg={msg} isMine={msg.sender_id === userId} />
+                {msg._status === 'failed' && msg.sender_id === userId && (
+                  <Pressable
+                    onPress={() => retryMessage(msg as OptimisticMessage)}
+                    style={{ alignSelf: 'flex-end', paddingHorizontal: 8, paddingBottom: 6 }}
+                  >
+                    <Text style={{ fontSize: 11, color: colors.error, fontWeight: '500', cursor: 'pointer' as any }}>
+                      Tap to retry
+                    </Text>
+                  </Pressable>
+                )}
+              </View>
             ))
           )}
         </ScrollView>
