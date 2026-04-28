@@ -262,10 +262,10 @@ export default function ListingDetailScreenWeb() {
             <Text className="text-sm text-muted-foreground">Listing</Text>
           </View>
           <View className="flex-row items-center gap-2">
-            <Pressable className="w-9 h-9 border-[1.5px] border-border rounded-lg items-center justify-center" onPress={() => router.push("/saved")}>
+            <Pressable className="w-9 h-9 border-[1.5px] border-border rounded-lg items-center justify-center" onPress={() => router.push("/saved")} style={{ cursor: "pointer" as any }}>
               <Ionicons name="heart-outline" size={16} color={colors.dark} />
             </Pressable>
-            <Pressable className="w-9 h-9 border-[1.5px] border-border rounded-lg items-center justify-center" onPress={() => router.push("/inbox")} style={{ position: "relative" as any }}>
+            <Pressable className="w-9 h-9 border-[1.5px] border-border rounded-lg items-center justify-center" onPress={() => router.push("/inbox")} style={{ position: "relative" as any, cursor: "pointer" as any }}>
               <Ionicons name="chatbubble-outline" size={16} color={colors.dark} />
               {unreadCount > 0 && (
                 <View style={{
@@ -281,7 +281,7 @@ export default function ListingDetailScreenWeb() {
                 </View>
               )}
             </Pressable>
-            <Pressable className="w-9 h-9 border-[1.5px] border-border rounded-lg items-center justify-center" onPress={() => router.push("/profile")}>
+            <Pressable className="w-9 h-9 border-[1.5px] border-border rounded-lg items-center justify-center" onPress={() => router.push("/profile")} style={{ cursor: "pointer" as any }}>
               <Ionicons name="person-outline" size={16} color={colors.dark} />
             </Pressable>
           </View>
@@ -390,6 +390,11 @@ export default function ListingDetailScreenWeb() {
                     <Text>{listing.category}</Text>
                   </Badge>
                 </View>
+                {listing.status === "sold" && (
+                  <View className="rounded-md px-4 py-2 items-center" style={{ backgroundColor: colors.errorLight }}>
+                    <Text className="text-sm font-bold" style={{ color: colors.error }}>This listing has been sold</Text>
+                  </View>
+                )}
               </CardHeader>
 
               <Separator />
@@ -427,13 +432,14 @@ export default function ListingDetailScreenWeb() {
                 {isOwner ? (
                   <View className="gap-3 mt-2">
                     <View className="flex-row items-center gap-3">
-                      <Button variant="outline" className="flex-1" onPress={openEdit}>
+                      <Button variant="outline" className="flex-1" onPress={openEdit} style={{ cursor: "pointer" as any }}>
                         <Ionicons name="create-outline" size={16} color={colors.ink} />
                         <Text className="ml-2 text-sm font-semibold text-foreground">Edit</Text>
                       </Button>
                       <Button
                         variant="destructive"
                         className="flex-1"
+                        style={{ cursor: "pointer" as any }}
                         onPress={async () => {
                           if (!window.confirm("Are you sure you want to delete this listing?")) return;
                           await fetch(API.listing(listing.id), {
@@ -448,51 +454,68 @@ export default function ListingDetailScreenWeb() {
                       </Button>
                     </View>
                     {listing.status === "active" && (
-                      <Button variant="outline" onPress={() => setSoldOpen(true)}>
-                        <Ionicons name="checkmark-circle-outline" size={16} color={colors.ink} />
-                        <Text className="ml-2 text-sm font-semibold text-foreground">Mark as Sold</Text>
+                      <Button variant="outline" onPress={() => setSoldOpen(true)} disabled={soldSaving} style={{ cursor: "pointer" as any }}>
+                        {soldSaving ? (
+                          <ActivityIndicator size="small" color={colors.ink} />
+                        ) : (
+                          <>
+                            <Ionicons name="checkmark-circle-outline" size={16} color={colors.ink} />
+                            <Text className="ml-2 text-sm font-semibold text-foreground">Mark as Sold</Text>
+                          </>
+                        )}
                       </Button>
                     )}
                   </View>
                 ) : (
                   <View className="gap-3 mt-2">
-                    <View className="gap-1.5">
-                      <Text className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                        Message Seller
-                      </Text>
-                      <Textarea
-                        value={msgText}
-                        onChangeText={setMsgText}
-                        placeholder="Hi, is this still available?"
-                        numberOfLines={3}
-                        editable={!msgSending}
-                      />
-                      {msgError ? (
-                        <Text className="text-xs text-destructive">{msgError}</Text>
-                      ) : null}
-                    </View>
-                    <View className="flex-row items-center gap-3">
-                      <Button
-                        className="flex-1"
-                        onPress={sendFirstMessage}
-                        disabled={msgSending || !msgText.trim()}
-                      >
-                        {msgSending ? (
-                          <ActivityIndicator size="small" color={colors.white} />
-                        ) : (
-                          <>
-                            <Ionicons name="send-outline" size={16} color={colors.white} />
-                            <Text className="ml-2 text-sm font-semibold text-primary-foreground">Send</Text>
-                          </>
-                        )}
-                      </Button>
-                      <Pressable onPress={toggleSave} style={{ width: 44, height: 44, borderRadius: 22, borderWidth: 1, borderColor: colors.border, alignItems: "center", justifyContent: "center" }}>
-                        <Ionicons name={saved ? "heart" : "heart-outline"} size={22} color={colors.primary} />
-                      </Pressable>
-                    </View>
+                    {listing.status === "sold" ? (
+                      <View className="rounded-md px-4 py-3 items-center" style={{ backgroundColor: colors.bg }}>
+                        <Text className="text-sm text-muted-foreground text-center">This listing has been sold and is no longer available.</Text>
+                      </View>
+                    ) : (
+                      <>
+                        <View className="gap-1.5">
+                          <Text className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                            Message Seller
+                          </Text>
+                          <Textarea
+                            value={msgText}
+                            onChangeText={setMsgText}
+                            placeholder="Hi, is this still available?"
+                            numberOfLines={3}
+                            editable={!msgSending}
+                          />
+                          {msgError ? (
+                            <Text className="text-xs text-destructive">{msgError}</Text>
+                          ) : null}
+                        </View>
+                        <View className="flex-row items-center gap-3">
+                          <Button
+                            className="flex-1"
+                            onPress={sendFirstMessage}
+                            disabled={msgSending || !msgText.trim()}
+                          >
+                            {msgSending ? (
+                              <ActivityIndicator size="small" color={colors.white} />
+                            ) : (
+                              <>
+                                <Ionicons name="send-outline" size={16} color={colors.white} />
+                                <Text className="ml-2 text-sm font-semibold text-primary-foreground">Send</Text>
+                              </>
+                            )}
+                          </Button>
+                          <Pressable onPress={toggleSave} style={{ width: 44, height: 44, borderRadius: 22, borderWidth: 1, borderColor: colors.border, alignItems: "center", justifyContent: "center", cursor: "pointer" as any }}>
+                            <Ionicons name={saved ? "heart" : "heart-outline"} size={22} color={colors.primary} />
+                          </Pressable>
+                        </View>
+                      </>
+                    )}
                     <View className="items-start">
                       {reportSubmitted ? (
-                        <Text className="text-xs text-muted-foreground">Report submitted.</Text>
+                        <View className="flex-row items-center gap-1.5">
+                          <Ionicons name="checkmark-circle" size={14} color={colors.success} />
+                          <Text className="text-xs text-muted-foreground">Report submitted.</Text>
+                        </View>
                       ) : reportOpen ? (
                         <View className="gap-2 w-full">
                           <Text className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Report reason</Text>
@@ -502,23 +525,27 @@ export default function ListingDetailScreenWeb() {
                                 key={r}
                                 onPress={() => setReportReason(r)}
                                 className="px-3 py-1.5 rounded-full border"
-                                style={reportReason === r ? { backgroundColor: colors.primaryLight, borderColor: colors.primary } : { borderColor: colors.border }}
+                                style={reportReason === r ? { backgroundColor: colors.primaryLight, borderColor: colors.primary, cursor: "pointer" as any } : { borderColor: colors.border, cursor: "pointer" as any }}
                               >
                                 <Text className="text-xs font-semibold" style={{ color: reportReason === r ? colors.primary : colors.dark }}>{r}</Text>
                               </Pressable>
                             ))}
                           </View>
                           <View className="flex-row gap-2">
-                            <Button variant="outline" onPress={() => { setReportOpen(false); setReportReason(""); }}>
+                            <Button variant="outline" onPress={() => { setReportOpen(false); setReportReason(""); }} style={{ cursor: "pointer" as any }}>
                               <Text className="text-xs">Cancel</Text>
                             </Button>
-                            <Button onPress={handleReport} disabled={!reportReason || reportSending}>
-                              <Text className="text-xs text-primary-foreground">{reportSending ? "Sending..." : "Submit"}</Text>
+                            <Button onPress={handleReport} disabled={!reportReason || reportSending} style={{ cursor: "pointer" as any }}>
+                              {reportSending ? (
+                                <ActivityIndicator size="small" color={colors.white} />
+                              ) : (
+                                <Text className="text-xs text-primary-foreground">Submit</Text>
+                              )}
                             </Button>
                           </View>
                         </View>
                       ) : (
-                        <Pressable onPress={() => setReportOpen(true)}>
+                        <Pressable onPress={() => setReportOpen(true)} style={{ cursor: "pointer" as any }}>
                           <Text className="text-xs text-muted-foreground underline">Report listing</Text>
                         </Pressable>
                       )}

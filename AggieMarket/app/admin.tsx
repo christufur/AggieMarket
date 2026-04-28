@@ -214,7 +214,7 @@ export default function AdminScreen() {
             style={{ maxWidth: 1100, marginHorizontal: "auto", width: "100%" }}
           >
             <View className="flex-row items-center gap-3">
-              <Pressable onPress={() => router.push("/home")} className="flex-row items-center gap-1.5">
+              <Pressable onPress={() => router.push("/home")} className="flex-row items-center gap-1.5" style={{ cursor: 'pointer' as any }}>
                 <View className="bg-primary rounded px-1.5 py-0.5">
                   <Text className="text-xs font-bold text-primary-foreground">AM</Text>
                 </View>
@@ -227,13 +227,14 @@ export default function AdminScreen() {
               <Pressable
                 className="w-9 h-9 border-[1.5px] border-border rounded-lg items-center justify-center"
                 onPress={() => router.push("/saved")}
+                style={{ cursor: 'pointer' as any }}
               >
                 <Ionicons name="heart-outline" size={16} color={colors.dark} />
               </Pressable>
               <Pressable
                 className="w-9 h-9 border-[1.5px] border-border rounded-lg items-center justify-center"
                 onPress={() => router.push("/inbox")}
-                style={{ position: "relative" as any }}
+                style={{ position: "relative" as any, cursor: 'pointer' as any }}
               >
                 <Ionicons name="chatbubble-outline" size={16} color={colors.dark} />
                 {unreadCount > 0 && (
@@ -253,6 +254,7 @@ export default function AdminScreen() {
               <Pressable
                 className="w-9 h-9 border-[1.5px] border-border rounded-lg items-center justify-center"
                 onPress={() => router.push("/profile")}
+                style={{ cursor: 'pointer' as any }}
               >
                 <Ionicons name="person-outline" size={16} color={colors.dark} />
               </Pressable>
@@ -285,7 +287,12 @@ export default function AdminScreen() {
               <Pressable
                 key={t}
                 className="px-4 py-2 rounded-full"
-                style={tab === t ? { backgroundColor: colors.primaryLight } : undefined}
+                style={[
+                  tab === t
+                    ? { backgroundColor: colors.primaryLight, borderWidth: 1, borderColor: colors.primaryBorder }
+                    : { backgroundColor: 'transparent' },
+                  { cursor: 'pointer' as any, transition: 'background-color 150ms ease' as any },
+                ]}
                 onPress={() => setTab(t)}
               >
                 <Text
@@ -300,22 +307,40 @@ export default function AdminScreen() {
 
           {/* Content */}
           {isLoading ? (
-            <View className="items-center py-16">
-              <ActivityIndicator color={colors.ink} />
-            </View>
+            <Card>
+              {[1,2,3,4,5].map((i, idx) => (
+                <View key={i}>
+                  {idx > 0 && <View className="border-t border-border" />}
+                  <View className="flex-row items-start gap-4 px-5 py-4">
+                    <View className="gap-2 flex-1">
+                      <View style={{ height: 20, width: 80, backgroundColor: colors.border, borderRadius: 6 }} />
+                      <View style={{ height: 14, width: '70%', backgroundColor: colors.bg, borderRadius: 6 }} />
+                      <View style={{ height: 12, width: '40%', backgroundColor: colors.bg, borderRadius: 6 }} />
+                    </View>
+                    <View className="items-end gap-2" style={{ minWidth: 160 }}>
+                      <View style={{ height: 12, width: 100, backgroundColor: colors.bg, borderRadius: 6 }} />
+                      <View style={{ height: 12, width: 70, backgroundColor: colors.bg, borderRadius: 6 }} />
+                    </View>
+                  </View>
+                </View>
+              ))}
+            </Card>
           ) : reports.length === 0 ? (
             <View className="items-center py-16 gap-3">
-              <Ionicons name="checkmark-circle-outline" size={36} color={colors.mid} />
-              <Text className="text-sm text-muted-foreground">No {tab} reports</Text>
+              <Ionicons name="checkmark-circle-outline" size={40} color={colors.mid} />
+              <Text className="text-base font-semibold text-foreground">All clear</Text>
+              <Text className="text-sm text-muted-foreground text-center" style={{ maxWidth: 280 }}>
+                {tab === 'pending' ? 'No pending reports to review.' : `No ${tab} reports.`}
+              </Text>
             </View>
           ) : (
             <Card>
               {reports.map((report, idx) => (
-                <View key={report.id}>
+                <View key={report.id} className="group">
                   {idx > 0 && <View className="border-t border-border" />}
                   <View
-                    className="flex-row items-start gap-4 px-5 py-4"
-                    style={{ flexWrap: "wrap" as any }}
+                    className="flex-row items-start gap-4 px-5 py-4 group-hover:bg-muted"
+                    style={{ flexWrap: "wrap" as any, transition: 'background-color 150ms ease' as any }}
                   >
                     {/* Left: badge + preview + reason */}
                     <View className="gap-2" style={{ flex: 1, minWidth: 220 }}>
@@ -358,8 +383,8 @@ export default function AdminScreen() {
                         <View className="flex-row gap-2 mt-1">
                           <Pressable
                             onPress={() => openDialog(report, "resolve")}
-                            className="px-3 py-1.5 rounded-md"
-                            style={{ backgroundColor: colors.successLight }}
+                            className="px-4 py-2 rounded-md items-center justify-center"
+                            style={{ backgroundColor: colors.successLight, minHeight: 36, cursor: 'pointer' as any, transition: 'background-color 150ms ease' as any }}
                           >
                             <Text style={{ fontSize: 12, fontWeight: "600", color: colors.success }}>
                               Resolve
@@ -367,7 +392,8 @@ export default function AdminScreen() {
                           </Pressable>
                           <Pressable
                             onPress={() => openDialog(report, "dismiss")}
-                            className="px-3 py-1.5 rounded-md border border-border"
+                            className="px-4 py-2 rounded-md border border-border items-center justify-center"
+                            style={{ minHeight: 36, cursor: 'pointer' as any, transition: 'background-color 150ms ease' as any }}
                           >
                             <Text style={{ fontSize: 12, fontWeight: "600", color: colors.dark }}>
                               Dismiss
@@ -426,9 +452,16 @@ export default function AdminScreen() {
               disabled={submitting}
               style={dialogAction === "resolve" ? { backgroundColor: colors.success } : undefined}
             >
-              <Text style={dialogAction === "resolve" ? { color: colors.white } : undefined}>
-                {submitting ? "Saving..." : dialogAction === "resolve" ? "Resolve" : "Dismiss"}
-              </Text>
+              {submitting ? (
+                <View className="flex-row items-center gap-2">
+                  <ActivityIndicator size="small" color={dialogAction === "resolve" ? colors.white : colors.ink} />
+                  <Text style={dialogAction === "resolve" ? { color: colors.white } : undefined}>Saving...</Text>
+                </View>
+              ) : (
+                <Text style={dialogAction === "resolve" ? { color: colors.white } : undefined}>
+                  {dialogAction === "resolve" ? "Resolve" : "Dismiss"}
+                </Text>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

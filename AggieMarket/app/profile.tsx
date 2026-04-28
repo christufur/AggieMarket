@@ -152,7 +152,7 @@ export default function ProfileScreen() {
         <View className="bg-card border-b border-border px-6 py-3">
           <View className="flex-row items-center justify-between" style={{ maxWidth: 1100, marginHorizontal: "auto", width: "100%" }}>
             <View className="flex-row items-center gap-3">
-              <Pressable onPress={() => router.push("/home")} className="flex-row items-center gap-1.5">
+              <Pressable onPress={() => router.push("/home")} className="flex-row items-center gap-1.5" style={{ cursor: "pointer" as any }}>
                 <View className="bg-primary rounded px-1.5 py-0.5">
                   <Text className="text-xs font-bold text-primary-foreground">AM</Text>
                 </View>
@@ -162,10 +162,10 @@ export default function ProfileScreen() {
               <Text className="text-sm text-muted-foreground">User</Text>
             </View>
             <View className="flex-row items-center gap-2">
-              <Pressable className="w-9 h-9 border-[1.5px] border-border rounded-lg items-center justify-center" onPress={() => router.push("/saved")}>
+              <Pressable className="w-9 h-9 border-[1.5px] border-border rounded-lg items-center justify-center" onPress={() => router.push("/saved")} style={{ cursor: "pointer" as any }}>
                 <Ionicons name="heart-outline" size={16} color={colors.dark} />
               </Pressable>
-              <Pressable className="w-9 h-9 border-[1.5px] border-border rounded-lg items-center justify-center" onPress={() => router.push("/inbox")} style={{ position: "relative" as any }}>
+              <Pressable className="w-9 h-9 border-[1.5px] border-border rounded-lg items-center justify-center" onPress={() => router.push("/inbox")} style={{ position: "relative" as any, cursor: "pointer" as any }}>
                 <Ionicons name="chatbubble-outline" size={16} color={colors.dark} />
                 {unreadCount > 0 && (
                   <View style={{
@@ -184,6 +184,7 @@ export default function ProfileScreen() {
               <Pressable
                 className="p-2 rounded-md hover:bg-muted"
                 onPress={handleLogout}
+                style={{ cursor: "pointer" as any }}
               >
                 <Ionicons name="log-out-outline" size={18} color={colors.dark} />
               </Pressable>
@@ -210,6 +211,7 @@ export default function ProfileScreen() {
             {/* Edit cover button */}
             <Pressable
               className="absolute top-3 right-3 bg-card/80 rounded-md px-3 py-1.5 flex-row items-center gap-1.5"
+              style={{ cursor: "pointer" as any }}
               onPress={() => {
                 setEditName(profile?.name ?? user?.name ?? "");
                 setEditBio(profile?.bio ?? "");
@@ -308,7 +310,10 @@ export default function ProfileScreen() {
                         <Pressable
                           key={key}
                           className="px-4 py-2 rounded-full"
-                          style={contentTab === key ? { backgroundColor: colors.primaryLight } : undefined}
+                          style={[
+                            contentTab === key ? { backgroundColor: colors.primaryLight } : { backgroundColor: "transparent" },
+                            { cursor: "pointer" as any, transition: "background-color 150ms ease" as any },
+                          ]}
                           onPress={() => setContentTab(key)}
                         >
                           <Text className="text-sm font-semibold" style={{ color: contentTab === key ? colors.primary : colors.dark }}>
@@ -323,16 +328,19 @@ export default function ProfileScreen() {
                       {contentTab === "listings" && (
                         <View className="gap-3">
                           {/* Active / Sold sub-tab pills */}
-                          <View className="flex-row gap-1">
+                          <View style={{ flexDirection: "row", backgroundColor: colors.bg, borderRadius: 20, padding: 2, alignSelf: "flex-start" }}>
                             {(["active", "sold"] as const).map((tab) => {
                               const count = tab === "active" ? activeListings.length : soldListings.length;
                               return (
                                 <Pressable
                                   key={tab}
-                                  className="px-3 py-1.5 rounded-full border"
-                                  style={listingsTab === tab
-                                    ? { backgroundColor: colors.primaryLight, borderColor: colors.primary }
-                                    : { borderColor: colors.border }}
+                                  className="px-3 py-1.5 rounded-full"
+                                  style={[
+                                    listingsTab === tab
+                                      ? { backgroundColor: colors.primaryLight, borderColor: colors.primary, borderWidth: 1 }
+                                      : { backgroundColor: "transparent" },
+                                    { cursor: "pointer" as any, transition: "background-color 150ms ease" as any },
+                                  ]}
                                   onPress={() => setListingsTab(tab)}
                                 >
                                   <Text className="text-xs font-semibold" style={{ color: listingsTab === tab ? colors.primary : colors.dark }}>
@@ -353,7 +361,7 @@ export default function ProfileScreen() {
                             <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12 }}>
                               {(listingsTab === "active" ? activeListings : soldListings).map((item) => (
                                 <Card key={item.id} className="overflow-hidden transition-shadow hover:shadow-lg">
-                                  <Pressable onPress={() => router.push(`/listing/${item.id}`)}>
+                                  <Pressable onPress={() => router.push(`/listing/${item.id}`)} style={{ cursor: "pointer" as any }}>
                                     {item.image_url ? (
                                       <Image source={{ uri: API.mediaUrl(item.image_url) }} style={{ width: "100%" as any, height: 120 }} resizeMode="cover" />
                                     ) : (
@@ -372,7 +380,7 @@ export default function ProfileScreen() {
                                     </CardContent>
                                   </Pressable>
                                   <View className="px-3 pb-2">
-                                    <Pressable className="flex-row items-center gap-1 self-end p-1 rounded hover:bg-muted" onPress={() => deleteListing(item.id)}>
+                                    <Pressable className="flex-row items-center gap-1 self-end p-1 rounded hover:bg-muted" style={{ cursor: "pointer" as any }} onPress={() => deleteListing(item.id)}>
                                       <Ionicons name="trash-outline" size={13} color={colors.error} />
                                       <Text className="text-xs" style={{ color: colors.error }}>Delete</Text>
                                     </Pressable>
@@ -395,7 +403,7 @@ export default function ProfileScreen() {
                           <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12 }}>
                             {services.map((item) => (
                               <Card key={item.id} className="overflow-hidden transition-shadow hover:shadow-lg">
-                                <Pressable onPress={() => router.push(`/service/${item.id}`)}>
+                                <Pressable onPress={() => router.push(`/service/${item.id}`)} style={{ cursor: "pointer" as any }}>
                                   {item.image_url ? (
                                     <Image source={{ uri: API.mediaUrl(item.image_url) }} style={{ width: "100%" as any, height: 120 }} resizeMode="cover" />
                                   ) : (
@@ -411,7 +419,7 @@ export default function ProfileScreen() {
                                   </CardContent>
                                 </Pressable>
                                 <View className="px-3 pb-2">
-                                  <Pressable className="flex-row items-center gap-1 self-end p-1 rounded hover:bg-muted" onPress={() => deleteService(item.id)}>
+                                  <Pressable className="flex-row items-center gap-1 self-end p-1 rounded hover:bg-muted" style={{ cursor: "pointer" as any }} onPress={() => deleteService(item.id)}>
                                     <Ionicons name="trash-outline" size={13} color={colors.error} />
                                     <Text className="text-xs" style={{ color: colors.error }}>Delete</Text>
                                   </Pressable>
@@ -433,7 +441,7 @@ export default function ProfileScreen() {
                           <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12 }}>
                             {events.map((item) => (
                               <Card key={item.id} className="overflow-hidden transition-shadow hover:shadow-lg">
-                                <Pressable onPress={() => router.push(`/event/${item.id}`)}>
+                                <Pressable onPress={() => router.push(`/event/${item.id}`)} style={{ cursor: "pointer" as any }}>
                                   {item.image_url ? (
                                     <Image source={{ uri: API.mediaUrl(item.image_url) }} style={{ width: "100%" as any, height: 120 }} resizeMode="cover" />
                                   ) : (
@@ -450,7 +458,7 @@ export default function ProfileScreen() {
                                   </CardContent>
                                 </Pressable>
                                 <View className="px-3 pb-2">
-                                  <Pressable className="flex-row items-center gap-1 self-end p-1 rounded hover:bg-muted" onPress={() => deleteEvent(item.id)}>
+                                  <Pressable className="flex-row items-center gap-1 self-end p-1 rounded hover:bg-muted" style={{ cursor: "pointer" as any }} onPress={() => deleteEvent(item.id)}>
                                     <Ionicons name="trash-outline" size={13} color={colors.error} />
                                     <Text className="text-xs" style={{ color: colors.error }}>Delete</Text>
                                   </Pressable>
@@ -532,32 +540,57 @@ export default function ProfileScreen() {
                           </View>
                         </View>
                         {/* Individual review rows */}
-                        <View className="gap-4">
-                          {ratings.map((r) => (
-                            <View key={r.id} className="gap-1.5 pb-4 border-b border-border last:border-0">
-                              <View className="flex-row items-center justify-between">
-                                <Text className="text-sm font-semibold text-foreground">{r.reviewer_name ?? "Anonymous"}</Text>
-                                <Text className="text-xs text-muted-foreground">{fmtDate(r.created_at)}</Text>
+                        {ratingsLoading && ratings.length === 0 ? (
+                          <View className="gap-3">
+                            {[1, 2, 3].map((i) => (
+                              <View key={i} className="flex-row gap-3 py-3">
+                                <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.border }} />
+                                <View className="flex-1 gap-2">
+                                  <View style={{ height: 12, width: "40%", backgroundColor: colors.border, borderRadius: 6 }} />
+                                  <View style={{ height: 10, width: "60%", backgroundColor: colors.bg, borderRadius: 6 }} />
+                                </View>
                               </View>
-                              <View className="flex-row gap-0.5">
-                                {[1, 2, 3, 4, 5].map((i) => (
-                                  <Ionicons
-                                    key={i}
-                                    name={i <= r.stars ? "star" : "star-outline"}
-                                    size={13}
-                                    color={i <= r.stars ? colors.primary : colors.border}
-                                  />
-                                ))}
+                            ))}
+                          </View>
+                        ) : (
+                          <View className="gap-4">
+                            {ratings.map((r) => (
+                              <View key={r.id} style={{ flexDirection: "row", gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+                                {/* Avatar circle with initials */}
+                                <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.primaryLight, alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                                  <Text style={{ fontSize: 13, fontWeight: "700", color: colors.primary }}>
+                                    {(r.reviewer_name ?? "U").charAt(0).toUpperCase()}
+                                  </Text>
+                                </View>
+                                {/* Content */}
+                                <View style={{ flex: 1, gap: 4 }}>
+                                  <View className="flex-row items-center justify-between">
+                                    <Text className="text-sm font-semibold text-foreground">{r.reviewer_name ?? "Anonymous"}</Text>
+                                    <Text className="text-xs text-muted-foreground">{fmtDate(r.created_at)}</Text>
+                                  </View>
+                                  <View className="flex-row gap-0.5">
+                                    {[1, 2, 3, 4, 5].map((i) => (
+                                      <Ionicons
+                                        key={i}
+                                        name={i <= r.stars ? "star" : "star-outline"}
+                                        size={13}
+                                        color={i <= r.stars ? colors.primary : colors.border}
+                                      />
+                                    ))}
+                                  </View>
+                                  {r.body ? <Text className="text-sm text-foreground" style={{ marginTop: 2 }}>{r.body}</Text> : null}
+                                </View>
                               </View>
-                              {r.body ? (
-                                <Text className="text-sm text-foreground">{r.body}</Text>
-                              ) : null}
-                            </View>
-                          ))}
-                        </View>
+                            ))}
+                          </View>
+                        )}
                         {ratings.length >= 20 && (
                           <Button variant="outline" onPress={loadMoreRatings} disabled={ratingsLoading}>
-                            <Text>{ratingsLoading ? "Loading..." : "Load more"}</Text>
+                            {ratingsLoading ? (
+                              <ActivityIndicator size="small" color={colors.primary} />
+                            ) : (
+                              <Text>Load more</Text>
+                            )}
                           </Button>
                         )}
                       </View>
