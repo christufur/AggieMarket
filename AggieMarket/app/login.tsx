@@ -42,8 +42,8 @@ export default function LoginScreenWeb() {
       } else {
         setError(data.message || "Login failed.");
       }
-    } catch (e: any) {
-      setError(`Network error: ${e?.message ?? "unknown"}`);
+    } catch (e: unknown) {
+      setError(`Network error: ${e instanceof Error ? e.message : "unknown"}`);
     } finally {
       setLoading(false);
     }

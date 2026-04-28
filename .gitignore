@@ -30,7 +30,7 @@ server/uploads/
 wireframes.html
 
 # markdown files
-*.md
+
 
 # SLDS/icons (large vendored files)
 **/public/icons/

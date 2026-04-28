@@ -27,7 +27,24 @@ export default function VerifyEmailScreen() {
   const inputs = useRef<(TextInput | null)[]>([]);
 
   const handleChange = (text: string, index: number) => {
-    const digit = text.replace(/[^0-9]/g, "").slice(-1);
+    const cleaned = text.replace(/[^0-9]/g, "");
+
+    // Paste: distribute digits across boxes starting at current index
+    if (cleaned.length > 1) {
+      const next = [...digits];
+      cleaned.split("").forEach((ch, i) => {
+        if (index + i < CODE_LENGTH) next[index + i] = ch;
+      });
+      setDigits(next);
+      setError("");
+      const lastFilled = Math.min(index + cleaned.length, CODE_LENGTH) - 1;
+      inputs.current[lastFilled]?.focus();
+      const code = next.join("");
+      if (code.length === CODE_LENGTH && !code.includes("")) handleVerify(code);
+      return;
+    }
+
+    const digit = cleaned.slice(-1);
     const next = [...digits];
     next[index] = digit;
     setDigits(next);
@@ -121,7 +138,6 @@ export default function VerifyEmailScreen() {
                 onChangeText={(t) => handleChange(t, i)}
                 onKeyPress={({ nativeEvent }) => handleKeyPress(nativeEvent.key, i)}
                 keyboardType="number-pad"
-                maxLength={1}
                 selectTextOnFocus
                 editable={!loading && !success}
                 caretHidden

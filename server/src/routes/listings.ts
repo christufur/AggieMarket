@@ -1,6 +1,18 @@
 import { Elysia } from "elysia";
 import { jwt } from "@elysiajs/jwt";
 import db from "../db";
+import crypto from "crypto";
+import { requireAuth, parsePagination } from "../utils/auth";
+
+type PatchListingBody = {
+    title?: string;
+    description?: string;
+    price?: number | null;
+    is_free?: number | null;
+    category?: string;
+    condition?: string | null;
+    status?: string;
+};
 
 function buildListingsQuery(options: {
     category?: string;
@@ -122,33 +134,26 @@ const listingsRoutes = new Elysia()
             q?: string;
         };
 
-        const { sql, params } = buildListingsQuery({ category, condition, minPrice, maxPrice, q });
-        const listings = db.query(sql).all(...params);
+        const conditions: string[] = ["l.status = 'active'"];
+        const params: any[] = [];
 
-        return { listings, status: 200 };
-    })
+        if (category) { conditions.push("l.category = ?"); params.push(category); }
+        if (condition) { conditions.push("l.condition = ?"); params.push(condition); }
+        if (minPrice) { conditions.push("l.price >= ?"); params.push(Number(minPrice)); }
+        if (maxPrice) { conditions.push("l.price <= ?"); params.push(Number(maxPrice)); }
+        if (q) {
+            conditions.push("(l.title LIKE ? OR l.description LIKE ?)");
+            params.push(`%${q}%`, `%${q}%`);
+        }
 
-    .get("/search", ({ query }) => {
-        const { category, min_price, max_price, limit, offset, q, condition } = query as {
-            category?: string;
-            min_price?: string;
-            max_price?: string;
-            limit?: string;
-            offset?: string;
-            q?: string;
-            condition?: string;
-        };
-
-        const { sql, params } = buildListingsQuery({
-            category,
-            condition,
-            minPrice: min_price,
-            maxPrice: max_price,
-            limit,
-            offset,
-            q,
-        });
-        const listings = db.query(sql).all(...params);
+        const where = conditions.join(" AND ");
+        const listings = db.query(
+            `SELECT l.*, u.name AS seller_name,
+                    (SELECT s3_url FROM listing_images WHERE listing_id = l.id ORDER BY sort_order ASC LIMIT 1) AS image_url
+             FROM listings l
+             LEFT JOIN users u ON u.id = l.seller_id
+             WHERE ${where} ORDER BY l.created_at DESC`
+        ).all(...params);
 
         return { listings, status: 200 };
     })

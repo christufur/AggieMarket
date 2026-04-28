@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback, memo } from "react";
 import {
   View, Pressable, ScrollView,
-  Modal, Switch, ActivityIndicator, Animated, useWindowDimensions, Image,
+  Switch, ActivityIndicator, Animated, useWindowDimensions, Image,
 } from "react-native";
 import { useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
@@ -9,6 +9,7 @@ import * as ImagePicker from "expo-image-picker";
 import DatePicker from "react-datepicker";
 import { colors } from "../theme/colors";
 import { useAuth } from "../context/AuthContext";
+import { useWebSocket } from "../context/WebSocketContext";
 import { API } from "../constants/api";
 import { Ionicons } from "@expo/vector-icons";
 import { Text } from "@/components/ui/text";
@@ -18,7 +19,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -78,22 +79,20 @@ type PostForm = {
   endsAt: Date | null;
   eventFree: boolean;
   ticketPrice: string;
+  externalLink: string;
 };
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const CONDITIONS = ["New", "Like New", "Good", "Fair", "For Parts"];
-const LISTING_CATEGORIES = ["Textbooks", "Furniture", "Electronics", "Clothing", "Other"];
-const SERVICE_CATEGORIES = ["Tutoring", "Design", "Tech", "Writing", "Music", "Other"];
-const EVENT_CATEGORIES = ["Academic", "Social", "Career", "Sports", "Other"];
-const PRICE_TYPES = ["hourly", "flat", "starting_at"];
+import { CONDITIONS, LISTING_CATEGORIES, SERVICE_CATEGORIES, EVENT_CATEGORIES, PRICE_TYPES } from "@/constants/categories";
+import { priceLabel, fmtDate as formatDate } from "@/lib/utils";
 
 const EMPTY_FORM: PostForm = {
   title: "", description: "", categories: [],
   condition: "Good", price: "", isFree: false,
   priceType: "hourly", availability: "",
   location: "", startsAt: null, endsAt: null,
-  eventFree: true, ticketPrice: "",
+  eventFree: true, ticketPrice: "", externalLink: "",
 };
 
 const TAB_LABELS: { key: TabType; label: string }[] = [
@@ -103,17 +102,6 @@ const TAB_LABELS: { key: TabType; label: string }[] = [
 ];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function formatDate(iso: string) {
-  const d = new Date(iso);
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-}
-
-function priceLabel(price: number | null, price_type: string | null) {
-  if (price == null) return "Free";
-  const suffix = price_type === "hourly" ? "/hr" : price_type === "starting_at" ? "+" : "";
-  return `$${price}${suffix}`;
-}
 
 // ─── Toast ────────────────────────────────────────────────────────────────────
 
@@ -175,7 +163,7 @@ const ListingCard = memo(function ListingCard({ item }: { item: Listing }) {
           shadowOffset: { width: 0, height: hovered ? 8 : 2 },
           shadowOpacity: hovered ? 0.15 : 0.06,
           shadowRadius: hovered ? 20 : 8,
-          borderColor: hovered ? "#8C0B42" : undefined,
+          borderColor: hovered ? colors.primary : undefined,
         } as any}
       >
         {item.image_url ? (
@@ -185,8 +173,8 @@ const ListingCard = memo(function ListingCard({ item }: { item: Listing }) {
             resizeMode="cover"
           />
         ) : (
-          <View className="w-full items-center justify-center border-b border-border" style={{ height: 208, backgroundColor: "#FDF2F6" }}>
-            <Ionicons name="image-outline" size={40} color="#8C0B42" style={{ opacity: 0.3 }} />
+          <View className="w-full items-center justify-center border-b border-border" style={{ height: 208, backgroundColor: colors.primaryLight }}>
+            <Ionicons name="image-outline" size={40} color={colors.primary} style={{ opacity: 0.3 }} />
           </View>
         )}
         <CardContent className="p-4 gap-2">
@@ -194,14 +182,14 @@ const ListingCard = memo(function ListingCard({ item }: { item: Listing }) {
           {item.seller_name && (
             <Text className="text-xs text-muted-foreground mt-0.5">by {item.seller_name}</Text>
           )}
-          <Text className="text-xl font-extrabold font-display tracking-tight" style={{ color: item.is_free ? "#2e7d32" : "#8C0B42" }}>{label}</Text>
+          <Text className="text-xl font-extrabold font-display tracking-tight" style={{ color: item.is_free ? colors.success : colors.primary }}>{label}</Text>
           <View className="flex-row gap-1.5 mt-1 flex-wrap">
             {item.condition && (
               <Badge variant="outline" className="px-2 py-0.5 rounded">
                 <Text className="text-[10px] font-medium">{item.condition}</Text>
               </Badge>
             )}
-            <Badge className="px-2 py-0.5 rounded" style={{ backgroundColor: "#FDF2F6", borderColor: "#F9C9DB", borderWidth: 1 }}>
+            <Badge className="px-2 py-0.5 rounded" style={{ backgroundColor: colors.primaryLight, borderColor: colors.primaryBorder, borderWidth: 1 }}>
               <Text className="text-[10px] font-medium" style={{ color: "#5E072D" }}>{item.category}</Text>
             </Badge>
           </View>
@@ -232,7 +220,7 @@ const ServiceCard = memo(function ServiceCard({ item }: { item: Service }) {
           shadowOffset: { width: 0, height: hovered ? 8 : 2 },
           shadowOpacity: hovered ? 0.15 : 0.06,
           shadowRadius: hovered ? 20 : 8,
-          borderColor: hovered ? "#8C0B42" : undefined,
+          borderColor: hovered ? colors.primary : undefined,
         } as any}
       >
         {item.image_url ? (
@@ -242,8 +230,8 @@ const ServiceCard = memo(function ServiceCard({ item }: { item: Service }) {
             resizeMode="cover"
           />
         ) : (
-          <View className="w-full items-center justify-center border-b border-border" style={{ height: 208, backgroundColor: "#FDF2F6" }}>
-            <Ionicons name="construct-outline" size={40} color="#8C0B42" style={{ opacity: 0.3 }} />
+          <View className="w-full items-center justify-center border-b border-border" style={{ height: 208, backgroundColor: colors.primaryLight }}>
+            <Ionicons name="construct-outline" size={40} color={colors.primary} style={{ opacity: 0.3 }} />
           </View>
         )}
         <CardContent className="p-4 gap-2">
@@ -251,13 +239,13 @@ const ServiceCard = memo(function ServiceCard({ item }: { item: Service }) {
           {item.provider_name && (
             <Text className="text-xs text-muted-foreground mt-0.5">by {item.provider_name}</Text>
           )}
-          <Text className="text-xl font-extrabold font-display tracking-tight" style={{ color: "#8C0B42" }}>{label}</Text>
+          <Text className="text-xl font-extrabold font-display tracking-tight" style={{ color: colors.primary }}>{label}</Text>
           {item.availability ? (
             <Text className="text-xs text-muted-foreground mt-0.5" numberOfLines={1}>{"\u23f0 "}{item.availability}</Text>
           ) : null}
           <View className="flex-row gap-1.5 mt-1 flex-wrap">
             {cats.map((c) => (
-              <Badge key={c} className="px-2 py-0.5 rounded" style={{ backgroundColor: "#FDF2F6", borderColor: "#F9C9DB", borderWidth: 1 }}>
+              <Badge key={c} className="px-2 py-0.5 rounded" style={{ backgroundColor: colors.primaryLight, borderColor: colors.primaryBorder, borderWidth: 1 }}>
                 <Text className="text-[10px] font-medium" style={{ color: "#5E072D" }}>{c}</Text>
               </Badge>
             ))}
@@ -289,7 +277,7 @@ const EventCard = memo(function EventCard({ item }: { item: Event }) {
           shadowOffset: { width: 0, height: hovered ? 8 : 2 },
           shadowOpacity: hovered ? 0.15 : 0.06,
           shadowRadius: hovered ? 20 : 8,
-          borderColor: hovered ? "#8C0B42" : undefined,
+          borderColor: hovered ? colors.primary : undefined,
         } as any}
       >
         {item.image_url ? (
@@ -299,8 +287,8 @@ const EventCard = memo(function EventCard({ item }: { item: Event }) {
             resizeMode="cover"
           />
         ) : (
-          <View className="w-full items-center justify-center border-b border-border" style={{ height: 208, backgroundColor: "#FDF2F6" }}>
-            <Ionicons name="calendar-outline" size={40} color="#8C0B42" style={{ opacity: 0.3 }} />
+          <View className="w-full items-center justify-center border-b border-border" style={{ height: 208, backgroundColor: colors.primaryLight }}>
+            <Ionicons name="calendar-outline" size={40} color={colors.primary} style={{ opacity: 0.3 }} />
           </View>
         )}
         <CardContent className="p-4 gap-2">
@@ -318,7 +306,7 @@ const EventCard = memo(function EventCard({ item }: { item: Event }) {
               <Text className={`text-[10px] font-medium ${item.is_free ? "text-green-800" : "text-yellow-800"}`}>{ticketLabel}</Text>
             </Badge>
             {cats.map((c) => (
-              <Badge key={c} className="px-2 py-0.5 rounded" style={{ backgroundColor: "#FDF2F6", borderColor: "#F9C9DB", borderWidth: 1 }}>
+              <Badge key={c} className="px-2 py-0.5 rounded" style={{ backgroundColor: colors.primaryLight, borderColor: colors.primaryBorder, borderWidth: 1 }}>
                 <Text className="text-[10px] font-medium" style={{ color: "#5E072D" }}>{c}</Text>
               </Badge>
             ))}
@@ -385,12 +373,16 @@ function CreatePostModal({
         headers: { Authorization: `Bearer ${token}` },
         body: formData,
       });
+      if (!uploadRes.ok) {
+        const errData = await uploadRes.json().catch(() => ({}));
+        throw new Error(errData.message ?? `Upload failed with status ${uploadRes.status}`);
+      }
       const uploadData = await uploadRes.json();
       if (uploadData.url) {
         await fetch(attachUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ url: uploadData.url, sort_order: i }),
+          body: JSON.stringify({ url: uploadData.url, s3_key: uploadData.s3_key, sort_order: i }),
         });
       }
     }
@@ -437,6 +429,7 @@ function CreatePostModal({
         ends_at: form.endsAt ? form.endsAt.toISOString() : null,
         is_free: form.eventFree,
         ticket_price: form.eventFree ? null : parseFloat(form.ticketPrice) || null,
+        external_link: form.externalLink.trim() || null,
       };
       url = API.events;
     }
@@ -456,7 +449,13 @@ function CreatePostModal({
             postType === "listing" ? API.listingImages(postId) :
             postType === "service" ? API.serviceImages(postId) :
             API.eventImages(postId);
-          await uploadImages(postId, attachUrl);
+          try {
+            await uploadImages(postId, attachUrl);
+          } catch (uploadErr: unknown) {
+            setError(`Post created but image upload failed: ${uploadErr instanceof Error ? uploadErr.message : "unknown error"}`);
+            onSaved(postType);
+            return;
+          }
         }
         setForm(EMPTY_FORM);
         setImages([]);
@@ -465,7 +464,8 @@ function CreatePostModal({
       } else {
         setError(data.message || "Failed to post.");
       }
-    } catch {
+    } catch (err) {
+      console.error("Post submit error:", err);
       setError("Could not connect to server.");
     } finally {
       setSaving(false);
@@ -713,6 +713,15 @@ function CreatePostModal({
                   />
                 </>
               )}
+              <Text className="text-[11px] font-bold tracking-wide text-muted-foreground uppercase mt-4 mb-1.5">Registration / Event Link</Text>
+              <Input
+                placeholder="https://example.com/register"
+                value={form.externalLink}
+                onChangeText={(v) => set("externalLink", v)}
+                editable={!saving}
+                className="text-sm"
+                style={{ outlineStyle: "none" } as any}
+              />
             </>
           )}
 
@@ -741,6 +750,7 @@ export default function HomeWebScreen() {
   const { user, token } = useAuth();
   const { width } = useWindowDimensions();
   const router = useRouter();
+  const { unreadCount } = useWebSocket();
 
   const [listings, setListings] = useState<Listing[]>([]);
   const [listingResults, setListingResults] = useState<Listing[]>([]);
@@ -758,8 +768,7 @@ export default function HomeWebScreen() {
   const fetchListings = useCallback(() => {
     fetch(API.listings)
       .then((r) => r.json())
-      .then((d) => { if (d.listings) setListings(d.listings); })
-      .catch(() => {});
+      .then((d) => { if (d.listings) setListings(d.listings); });
   }, []);
 
   const fetchListingResults = useCallback((searchQuery: string, category: string | null, condition: string | null) => {
@@ -783,16 +792,14 @@ export default function HomeWebScreen() {
     if (!token) return;
     fetch(API.services, { headers: { Authorization: `Bearer ${token}` } })
       .then((r) => r.json())
-      .then((d) => { if (d.services) setServices(d.services); })
-      .catch(() => {});
+      .then((d) => { if (d.services) setServices(d.services); });
   }, [token]);
 
   const fetchEvents = useCallback(() => {
     if (!token) return;
     fetch(API.events, { headers: { Authorization: `Bearer ${token}` } })
       .then((r) => r.json())
-      .then((d) => { if (d.events) setEvents(d.events); })
-      .catch(() => {});
+      .then((d) => { if (d.events) setEvents(d.events); });
   }, [token]);
 
   useEffect(() => {
@@ -860,7 +867,7 @@ export default function HomeWebScreen() {
 
   const isMobile = width < 768;
   const SIDEBAR = isMobile ? 0 : 220;
-  const contentWidth = Math.min(width - (isMobile ? 16 : 48), 1280);
+  const contentWidth = Math.min(width - (isMobile ? 16 : 48), 1100);
   const gridCols = isMobile ? (width < 480 ? 1 : 2) : 3;
 
   const tabPlaceholder =
@@ -896,7 +903,7 @@ export default function HomeWebScreen() {
           <View
             className={`flex-1 flex-row items-center bg-background border-[1.5px] rounded-lg px-3 h-[38px] gap-2 ${searchFocused ? "border-foreground" : "border-border"}`}
           >
-            <Ionicons name="search-outline" size={16} color="#757575" />
+            <Ionicons name="search-outline" size={16} color={colors.dark} />
             <Input
               className="flex-1 text-[13px] border-0 h-auto p-0"
               placeholder={isMobile ? "Search..." : tabPlaceholder}
@@ -910,12 +917,30 @@ export default function HomeWebScreen() {
 
           <View className="flex-row items-center gap-2 shrink-0">
             {!isMobile && (
-              <Pressable className="w-9 h-9 border-[1.5px] border-border rounded-lg items-center justify-center">
-                <Ionicons name="chatbubble-outline" size={16} color="#757575" />
-              </Pressable>
+              <>
+                <Pressable className="w-9 h-9 border-[1.5px] border-border rounded-lg items-center justify-center" onPress={() => router.push("/saved")}>
+                  <Ionicons name="heart-outline" size={16} color={colors.dark} />
+                </Pressable>
+                <Pressable className="w-9 h-9 border-[1.5px] border-border rounded-lg items-center justify-center" onPress={() => router.push("/inbox")} style={{ position: "relative" as any }}>
+                  <Ionicons name="chatbubble-outline" size={16} color={colors.dark} />
+                  {unreadCount > 0 && (
+                    <View style={{
+                      position: "absolute", top: -4, right: -4,
+                      backgroundColor: colors.primary, borderRadius: 100,
+                      minWidth: 16, height: 16, paddingHorizontal: 3,
+                      alignItems: "center", justifyContent: "center",
+                      borderWidth: 1.5, borderColor: colors.white,
+                    }}>
+                      <Text style={{ color: colors.white, fontSize: 9, fontWeight: "700" }}>
+                        {unreadCount > 99 ? "99+" : unreadCount}
+                      </Text>
+                    </View>
+                  )}
+                </Pressable>
+              </>
             )}
             <Pressable className="w-9 h-9 border-[1.5px] border-border rounded-lg items-center justify-center" onPress={() => router.push("/profile")}>
-              <Ionicons name="person-outline" size={16} color="#757575" />
+              <Ionicons name="person-outline" size={16} color={colors.dark} />
             </Pressable>
             <Button size="sm" onPress={() => setModalVisible(true)}>
               <Text className="text-primary-foreground text-[13px] font-bold">{isMobile ? "+" : "+ New Post"}</Text>
@@ -950,12 +975,12 @@ export default function HomeWebScreen() {
             <Pressable
               key={key}
               className={`px-4 py-2 rounded-full ${activeTab === key ? "" : ""}`}
-              style={activeTab === key ? { backgroundColor: "#FDF2F6" } : undefined}
+              style={activeTab === key ? { backgroundColor: colors.primaryLight } : undefined}
               onPress={() => switchTab(key)}
             >
               <Text
                 className="text-sm font-semibold"
-                style={{ color: activeTab === key ? "#8C0B42" : "#757575" }}
+                style={{ color: activeTab === key ? colors.primary : colors.dark }}
               >
                 {label}
               </Text>
@@ -971,19 +996,19 @@ export default function HomeWebScreen() {
             <Text className="text-[10px] font-extrabold tracking-[1.5px] text-muted-foreground uppercase mb-3 mt-1">Categories</Text>
             <Pressable
               className="py-2.5 px-3 rounded-md mb-1"
-              style={!activeCategory ? { backgroundColor: "#FDF2F6" } : undefined}
+              style={!activeCategory ? { backgroundColor: colors.primaryLight } : undefined}
               onPress={() => setActiveCategory(null)}
             >
-              <Text className="text-[13px] font-medium" style={{ color: !activeCategory ? "#8C0B42" : "#757575", fontWeight: !activeCategory ? "600" : "500" }}>All</Text>
+              <Text className="text-[13px] font-medium" style={{ color: !activeCategory ? colors.primary : colors.dark, fontWeight: !activeCategory ? "600" : "500" }}>All</Text>
             </Pressable>
             {currentCategories.map((c) => (
               <Pressable
                 key={c}
                 className="py-2.5 px-3 rounded-md mb-1"
-                style={activeCategory === c ? { backgroundColor: "#FDF2F6" } : undefined}
+                style={activeCategory === c ? { backgroundColor: colors.primaryLight } : undefined}
                 onPress={() => setActiveCategory(activeCategory === c ? null : c)}
               >
-                <Text className="text-[13px] font-medium" style={{ color: activeCategory === c ? "#8C0B42" : "#757575", fontWeight: activeCategory === c ? "600" : "500" }}>{c}</Text>
+                <Text className="text-[13px] font-medium" style={{ color: activeCategory === c ? colors.primary : colors.dark, fontWeight: activeCategory === c ? "600" : "500" }}>{c}</Text>
               </Pressable>
             ))}
 
@@ -993,19 +1018,19 @@ export default function HomeWebScreen() {
                 <Text className="text-[10px] font-extrabold tracking-[1.5px] text-muted-foreground uppercase mb-3 mt-1">Condition</Text>
                 <Pressable
                   className="py-2.5 px-3 rounded-md mb-1"
-                  style={!activeCondition ? { backgroundColor: "#FDF2F6" } : undefined}
+                  style={!activeCondition ? { backgroundColor: colors.primaryLight } : undefined}
                   onPress={() => setActiveCondition(null)}
                 >
-                  <Text className="text-[13px] font-medium" style={{ color: !activeCondition ? "#8C0B42" : "#757575", fontWeight: !activeCondition ? "600" : "500" }}>Any</Text>
+                  <Text className="text-[13px] font-medium" style={{ color: !activeCondition ? colors.primary : colors.dark, fontWeight: !activeCondition ? "600" : "500" }}>Any</Text>
                 </Pressable>
                 {CONDITIONS.map((c) => (
                   <Pressable
                     key={c}
                     className="py-2.5 px-3 rounded-md mb-1"
-                    style={activeCondition === c ? { backgroundColor: "#FDF2F6" } : undefined}
+                    style={activeCondition === c ? { backgroundColor: colors.primaryLight } : undefined}
                     onPress={() => setActiveCondition(activeCondition === c ? null : c)}
                   >
-                    <Text className="text-[13px] font-medium" style={{ color: activeCondition === c ? "#8C0B42" : "#757575", fontWeight: activeCondition === c ? "600" : "500" }}>{c}</Text>
+                    <Text className="text-[13px] font-medium" style={{ color: activeCondition === c ? colors.primary : colors.dark, fontWeight: activeCondition === c ? "600" : "500" }}>{c}</Text>
                   </Pressable>
                 ))}
               </>

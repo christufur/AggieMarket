@@ -150,6 +150,31 @@ db.run(`
   );
 `);
 
+// Add external_link if it doesn't exist (migration for existing DBs)
+try {
+  db.run(`ALTER TABLE events ADD COLUMN external_link TEXT`);
+} catch {
+  // column already exists
+}
+
+db.run(`
+  CREATE TABLE IF NOT EXISTS event_attendees (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_id TEXT NOT NULL,
+    user_id INTEGER NOT NULL,
+    status TEXT NOT NULL DEFAULT 'going',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    UNIQUE(event_id, user_id)
+  );
+`);
+
+db.run(`
+  CREATE INDEX IF NOT EXISTS idx_event_attendees_event ON event_attendees (event_id);
+  CREATE INDEX IF NOT EXISTS idx_event_attendees_user ON event_attendees (user_id);
+`);
+
 db.run(`
 -- FTS5 virtual table for listings
 CREATE VIRTUAL TABLE IF NOT EXISTS listings_fts USING fts5(
@@ -237,6 +262,7 @@ db.run(`
   -- Speeds up loading the message history within a specific chat
   CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages (conversation_id, created_at DESC);
   CREATE INDEX IF NOT EXISTS idx_messages_sender ON messages (sender_id);
+
   `);
 
 db.run(`
@@ -343,5 +369,64 @@ db.run(`
     ON reports (reporter_id, created_at DESC);
 `);
 
-  
+// saved items table
+db.run(`
+  CREATE TABLE IF NOT EXISTS saved_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    listing_id TEXT,
+    service_id TEXT,
+    event_id TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    UNIQUE(user_id, listing_id),
+    UNIQUE(user_id, service_id),
+    UNIQUE(user_id, event_id)
+  );
+`);
+
+db.run(`
+  CREATE INDEX IF NOT EXISTS idx_saved_items_user ON saved_items (user_id);
+  CREATE INDEX IF NOT EXISTS idx_saved_items_listing ON saved_items (listing_id);
+  CREATE INDEX IF NOT EXISTS idx_saved_items_service ON saved_items (service_id);
+  CREATE INDEX IF NOT EXISTS idx_saved_items_event ON saved_items (event_id);
+`);
+
+db.run(`
+  CREATE INDEX IF NOT EXISTS idx_listings_status_category ON listings(status, category);
+  CREATE INDEX IF NOT EXISTS idx_services_status_category ON services(status, category);
+  CREATE INDEX IF NOT EXISTS idx_events_status_starts ON events(status, starts_at);
+  CREATE INDEX IF NOT EXISTS idx_events_organizer ON events(organizer_id);
+  CREATE INDEX IF NOT EXISTS idx_services_provider ON services(provider_id);
+`);
+
+// Push tokens for APNs / Expo push notifications
+db.run(`
+  CREATE TABLE IF NOT EXISTS push_tokens (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    token TEXT NOT NULL,
+    platform TEXT NOT NULL DEFAULT 'ios',
+    is_active INTEGER DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, token),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+`);
+
+// is_admin column on users (TASK-9 admin moderation)
+try {
+  db.run(`ALTER TABLE users ADD COLUMN is_admin INTEGER DEFAULT 0`);
+} catch {
+  // column already exists
+}
+
+// Seed version tracking (TASK-6 idempotent seed)
+db.run(`
+  CREATE TABLE IF NOT EXISTS seed_meta (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+  );
+`);
+
 export default db;
