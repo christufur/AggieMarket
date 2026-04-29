@@ -9,6 +9,9 @@ import { colors } from "@/theme/colors";
 import { Text } from "@/components/ui/text";
 import { Card, CardContent } from "@/components/ui/card";
 import { fmtDate } from "@/lib/utils";
+import { Navbar } from "@/components/ui/navbar";
+import { CreatePostModal } from "@/components/ui/createpostmodal";
+
 
 type SavedListing = {
   saved_id: number;
@@ -42,6 +45,9 @@ type SavedEvent = {
 };
 
 export default function SavedScreen() {
+
+  const [modalVisible, setModalVisible] = useState(false);
+
   const { token } = useAuth();
   const router = useRouter();
   const { unreadCount } = useWebSocket();
@@ -65,6 +71,11 @@ export default function SavedScreen() {
 
   useEffect(() => { fetchSaved(); }, [fetchSaved]);
 
+  const closeModal = useCallback(() => setModalVisible(false), []);
+
+  const handleSaved = useCallback(() => {
+  }, []);
+
   const unsave = async (savedId: number, type: "listings" | "services" | "events") => {
     await fetch(API.savedItem(savedId), { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
     if (type === "listings") setListings((p) => p.filter((l) => l.saved_id !== savedId));
@@ -86,41 +97,9 @@ export default function SavedScreen() {
     <View className="flex-1 bg-background" style={{ minHeight: "100vh" as any }}>
       <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
         {/* Nav */}
-        <View className="bg-card border-b border-border px-6 py-3">
-          <View className="flex-row items-center justify-between" style={{ maxWidth: 1100, marginHorizontal: "auto", width: "100%" }}>
-            <View className="flex-row items-center gap-3">
-              <Pressable onPress={() => router.push("/home")} className="flex-row items-center gap-1.5">
-                <View className="bg-primary rounded px-1.5 py-0.5">
-                  <Text className="text-xs font-bold text-primary-foreground">AM</Text>
-                </View>
-                <Text className="text-sm font-semibold text-foreground">Home</Text>
-              </Pressable>
-              <Ionicons name="chevron-forward" size={12} color={colors.mid} />
-              <Text className="text-sm text-muted-foreground">Saved Items</Text>
-            </View>
-            <View className="flex-row items-center gap-2">
-              <Pressable className="w-9 h-9 border-[1.5px] border-border rounded-lg items-center justify-center" onPress={() => router.push("/inbox")} style={{ position: "relative" as any }}>
-                <Ionicons name="chatbubble-outline" size={16} color={colors.dark} />
-                {unreadCount > 0 && (
-                  <View style={{
-                    position: "absolute", top: -4, right: -4,
-                    backgroundColor: colors.primary, borderRadius: 100,
-                    minWidth: 16, height: 16, paddingHorizontal: 3,
-                    alignItems: "center", justifyContent: "center",
-                    borderWidth: 1.5, borderColor: colors.white,
-                  }}>
-                    <Text style={{ color: colors.white, fontSize: 9, fontWeight: "700" }}>
-                      {unreadCount > 99 ? "99+" : unreadCount}
-                    </Text>
-                  </View>
-                )}
-              </Pressable>
-              <Pressable className="w-9 h-9 border-[1.5px] border-border rounded-lg items-center justify-center" onPress={() => router.push("/profile")}>
-                <Ionicons name="person-outline" size={16} color={colors.dark} />
-              </Pressable>
-            </View>
-          </View>
-        </View>
+        <Navbar
+          onNewPost={() => setModalVisible(true)}
+        />
 
         <View style={{ maxWidth: 900, marginHorizontal: "auto", width: "100%" }} className="px-4 py-6">
           {/* Header */}
@@ -269,6 +248,13 @@ export default function SavedScreen() {
           )}
         </View>
       </ScrollView>
+
+      <CreatePostModal
+        visible={modalVisible}
+        onClose={closeModal}
+        onSaved={handleSaved}
+        token={token}
+      />
     </View>
   );
 }

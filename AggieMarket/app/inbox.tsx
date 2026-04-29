@@ -14,6 +14,9 @@ import { useWebSocket } from "@/context/WebSocketContext";
 import { API } from "@/constants/api";
 
 import type { Conversation, Message } from "@/types";
+import { Navbar } from "@/components/ui/navbar";
+import { CreatePostModal } from "@/components/ui/createpostmodal";
+
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -81,10 +84,10 @@ function ConversationRow({
         backgroundColor: selected
           ? colors.primaryLight
           : hovered
-          ? "#fdf6f9"
-          : hasUnread
-          ? "#fffafc"
-          : "transparent",
+            ? "#fdf6f9"
+            : hasUnread
+              ? "#fffafc"
+              : "transparent",
         borderRightWidth: selected ? 2 : 0,
         borderRightColor: colors.primary,
         transitionDuration: "120ms",
@@ -345,8 +348,8 @@ function ChatPanel({ conversation, token, userId }: {
         const itemPrice = conversation.listing_title
           ? (conversation.listing_is_free ? "Free" : conversation.listing_price != null ? `$${conversation.listing_price}` : null)
           : conversation.service_title
-          ? (conversation.service_price != null ? `$${conversation.service_price}` : null)
-          : null;
+            ? (conversation.service_price != null ? `$${conversation.service_price}` : null)
+            : null;
         const itemType = conversation.listing_id ? "listing" : conversation.service_id ? "service" : conversation.event_id ? "event" : null;
         const itemId = conversation.listing_id || conversation.service_id || conversation.event_id;
 
@@ -472,6 +475,11 @@ export default function InboxScreen() {
   const [selectedId, setSelectedId] = useState<string | null>(conversationParam ?? null);
   const [query, setQuery] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
+  const [modalVisible, setModalVisible] = useState(false);
+
+  const closeModal = useCallback(() => setModalVisible(false), []);
+  const handleSaved = useCallback(() => {
+  }, []);
 
   const isMobile = width < 640;
 
@@ -497,9 +505,9 @@ export default function InboxScreen() {
 
   const filtered = query.trim()
     ? conversations.filter((c) =>
-        c.partner_name.toLowerCase().includes(query.toLowerCase()) ||
-        (c.last_message_content ?? "").toLowerCase().includes(query.toLowerCase())
-      )
+      c.partner_name.toLowerCase().includes(query.toLowerCase()) ||
+      (c.last_message_content ?? "").toLowerCase().includes(query.toLowerCase())
+    )
     : conversations;
 
   const totalUnread = conversations.reduce((sum, c) => sum + c.unread_count, 0);
@@ -517,28 +525,10 @@ export default function InboxScreen() {
     <View className="flex-1 bg-background" style={{ height: "100vh" as any }}>
 
       {/* ── Navbar ── */}
-      <View className="bg-card border-b border-border px-6 py-3">
-        <View className="flex-row items-center justify-between" style={{ maxWidth: 1100, marginHorizontal: "auto", width: "100%" }}>
-          <View className="flex-row items-center gap-3">
-            <Pressable onPress={() => router.push("/home")} className="flex-row items-center gap-1.5">
-              <View className="bg-primary rounded px-1.5 py-0.5">
-                <Text className="text-xs font-bold text-primary-foreground">AM</Text>
-              </View>
-              <Text className="text-sm font-semibold text-foreground">Home</Text>
-            </Pressable>
-            <Ionicons name="chevron-forward" size={12} color={colors.mid} />
-            <Text className="text-sm text-muted-foreground">Messages</Text>
-          </View>
-          <View className="flex-row items-center gap-2">
-            <Pressable className="w-9 h-9 border-[1.5px] border-border rounded-lg items-center justify-center" onPress={() => router.push("/saved")}>
-              <Ionicons name="heart-outline" size={16} color={colors.dark} />
-            </Pressable>
-            <Pressable className="w-9 h-9 border-[1.5px] border-border rounded-lg items-center justify-center" onPress={() => router.push("/profile")}>
-              <Ionicons name="person-outline" size={16} color={colors.dark} />
-            </Pressable>
-          </View>
-        </View>
-      </View>
+      <Navbar
+        onNewPost={() => setModalVisible(true)}
+      />
+
 
       {/* ── Two-panel body ── */}
       <View style={{ flex: 1, flexDirection: "row", overflow: "hidden" }}>
@@ -565,9 +555,8 @@ export default function InboxScreen() {
               )}
             </View>
             <View
-              className={`flex-row items-center bg-background border-[1.5px] rounded-lg px-3 h-[34px] gap-2 ${
-                searchFocused ? "border-foreground" : "border-border"
-              }`}
+              className={`flex-row items-center bg-background border-[1.5px] rounded-lg px-3 h-[34px] gap-2 ${searchFocused ? "border-foreground" : "border-border"
+                }`}
             >
               <Ionicons name="search-outline" size={14} color={colors.dark} />
               <Input
@@ -626,6 +615,13 @@ export default function InboxScreen() {
           )}
         </View>
       </View>
+
+      <CreatePostModal
+        visible={modalVisible}
+        onClose={closeModal}
+        onSaved={handleSaved}
+        token={token}
+      />
     </View>
   );
 }

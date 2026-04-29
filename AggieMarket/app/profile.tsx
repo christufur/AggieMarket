@@ -26,6 +26,7 @@ import { colors } from "@/theme/colors";
 import type { ProfileData, ListingItem, ServiceItem, EventItem } from "@/types";
 import { fmtDate, fmtJoined } from "@/lib/utils";
 import { Navbar } from "@/components/ui/navbar";
+import { CreatePostModal } from "@/components/ui/createpostmodal";
 
 // ── Sub-components ───────────────────────────────────────────────────────────
 
@@ -41,6 +42,9 @@ function ProfileInfoRow({ icon, label }: { icon: keyof typeof Ionicons.glyphMap;
 // ── Main ─────────────────────────────────────────────────────────────────────
 
 export default function ProfileScreen() {
+
+  const [modalVisible, setModalVisible] = useState(false);
+
   const { user, token, logout } = useAuth();
   const router = useRouter();
   const { unreadCount } = useWebSocket();
@@ -78,6 +82,12 @@ export default function ProfileScreen() {
   }, [user, token]);
 
   useEffect(() => { fetchProfile(); }, [fetchProfile]);
+
+  const closeModal = useCallback(() => setModalVisible(false), []);
+
+  const handleSaved = useCallback(() => {
+    fetchProfile();
+  }, [fetchProfile]);
 
   const handleLogout = async () => {
     if (!window.confirm("Are you sure you want to log out?")) return;
@@ -133,51 +143,7 @@ export default function ProfileScreen() {
         {/* ── Top nav bar ── */}
         <Navbar
           onNewPost={() => setModalVisible(true)}
-          isMobile={isMobile}
-          contentWidth={contentWidth}
         />
-
-        <View className="bg-card border-b border-border px-6 py-3">
-          <View className="flex-row items-center justify-between" style={{ maxWidth: 1100, marginHorizontal: "auto", width: "100%" }}>
-            <View className="flex-row items-center gap-3">
-              <Pressable onPress={() => router.push("/home")} className="flex-row items-center gap-1.5">
-                <View className="bg-primary rounded px-1.5 py-0.5">
-                  <Text className="text-xs font-bold text-primary-foreground">AM</Text>
-                </View>
-                <Text className="text-sm font-semibold text-foreground">Home</Text>
-              </Pressable>
-              <Ionicons name="chevron-forward" size={12} color={colors.mid} />
-              <Text className="text-sm text-muted-foreground">User</Text>
-            </View>
-            <View className="flex-row items-center gap-2">
-              <Pressable className="w-9 h-9 border-[1.5px] border-border rounded-lg items-center justify-center" onPress={() => router.push("/saved")}>
-                <Ionicons name="heart-outline" size={16} color={colors.dark} />
-              </Pressable>
-              <Pressable className="w-9 h-9 border-[1.5px] border-border rounded-lg items-center justify-center" onPress={() => router.push("/inbox")} style={{ position: "relative" as any }}>
-                <Ionicons name="chatbubble-outline" size={16} color={colors.dark} />
-                {unreadCount > 0 && (
-                  <View style={{
-                    position: "absolute", top: -4, right: -4,
-                    backgroundColor: colors.primary, borderRadius: 100,
-                    minWidth: 16, height: 16, paddingHorizontal: 3,
-                    alignItems: "center", justifyContent: "center",
-                    borderWidth: 1.5, borderColor: colors.white,
-                  }}>
-                    <Text style={{ color: colors.white, fontSize: 9, fontWeight: "700" }}>
-                      {unreadCount > 99 ? "99+" : unreadCount}
-                    </Text>
-                  </View>
-                )}
-              </Pressable>
-              <Pressable
-                className="p-2 rounded-md hover:bg-muted"
-                onPress={handleLogout}
-              >
-                <Ionicons name="log-out-outline" size={18} color={colors.dark} />
-              </Pressable>
-            </View>
-          </View>
-        </View>
 
         {/* ── Cover photo ── */}
         <View style={{ maxWidth: 1100, marginHorizontal: "auto", width: "100%" }}>
@@ -239,6 +205,12 @@ export default function ProfileScreen() {
             <Text className="text-2xl font-bold text-foreground mt-3">
               {profile?.name ?? user?.name}
             </Text>
+            <Pressable
+              className="p-2 rounded-md hover:bg-muted"
+              onPress={handleLogout}
+            >
+              <Ionicons name="log-out-outline" size={18} color={colors.dark} />
+            </Pressable>
 
             {/* Meta badges */}
             <View className="flex-row items-center gap-3 mt-2 flex-wrap justify-center">
@@ -259,244 +231,244 @@ export default function ProfileScreen() {
 
           <View>
             {/* ── Two-column layout ── */}
-              <View className="flex-row items-stretch gap-6 px-4 py-6" style={{ flexWrap: "wrap" }}>
-                {/* Left column — About (stretches with right column; bio grows until email/rating) */}
-                <View className="self-stretch" style={{ width: 300, flexShrink: 0 }}>
-                  <Card className="flex-1">
-                    <CardHeader>
-                      <Text className="text-sm font-semibold text-foreground">About</Text>
-                    </CardHeader>
-                    <CardContent className="flex-1 flex-col pt-0">
-                      <View className="flex-1">
-                        <Text className="text-sm text-foreground">
-                          {profile?.bio || "No bio yet. Click Edit Profile to add one."}
-                        </Text>
-                      </View>
-                      <View>
-                        <Separator className="my-3" />
-                        <ProfileInfoRow icon="mail-outline" label={user?.email ?? ""} />
-                        {profile && profile.rating_count > 0 && (
-                          <ProfileInfoRow icon="star-outline" label={`${profile.rating_avg.toFixed(1)} avg (${profile.rating_count} reviews)`} />
-                        )}
-                      </View>
-                    </CardContent>
-                  </Card>
-                </View>
-
-                {/* Right column — Tabbed content */}
-                <View style={{ flex: 1, minWidth: 300 }}>
-                  <Card>
-                    {/* Tab pills */}
-                    <View className="flex-row gap-1 px-4 pt-4 pb-3 border-b border-border">
-                      {([
-                        { key: "listings" as const, label: "Listings", count: listings.length },
-                        { key: "services" as const, label: "Services", count: services.length },
-                        { key: "events" as const, label: "Events", count: events.length },
-                      ]).map(({ key, label, count }) => (
-                        <Pressable
-                          key={key}
-                          className="px-4 py-2 rounded-full"
-                          style={contentTab === key ? { backgroundColor: colors.primaryLight } : undefined}
-                          onPress={() => setContentTab(key)}
-                        >
-                          <Text className="text-sm font-semibold" style={{ color: contentTab === key ? colors.primary : colors.dark }}>
-                            {label} ({count})
-                          </Text>
-                        </Pressable>
-                      ))}
+            <View className="flex-row items-stretch gap-6 px-4 py-6" style={{ flexWrap: "wrap" }}>
+              {/* Left column — About (stretches with right column; bio grows until email/rating) */}
+              <View className="self-stretch" style={{ width: 300, flexShrink: 0 }}>
+                <Card className="flex-1">
+                  <CardHeader>
+                    <Text className="text-sm font-semibold text-foreground">About</Text>
+                  </CardHeader>
+                  <CardContent className="flex-1 flex-col pt-0">
+                    <View className="flex-1">
+                      <Text className="text-sm text-foreground">
+                        {profile?.bio || "No bio yet. Click Edit Profile to add one."}
+                      </Text>
                     </View>
-
-                    <CardContent className="pt-4">
-                      {/* Listings */}
-                      {contentTab === "listings" && (
-                        listings.length === 0 ? (
-                          <View className="items-center py-10">
-                            <Ionicons name="pricetag-outline" size={24} color={colors.mid} />
-                            <Text className="text-sm text-muted-foreground mt-2">No listings yet</Text>
-                          </View>
-                        ) : (
-                          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12 }}>
-                            {listings.map((item) => (
-                              <Card key={item.id} className="overflow-hidden transition-shadow hover:shadow-lg">
-                                <Pressable onPress={() => router.push(`/listing/${item.id}`)}>
-                                  {item.image_url ? (
-                                    <Image source={{ uri: API.mediaUrl(item.image_url) }} style={{ width: "100%" as any, height: 120 }} resizeMode="cover" />
-                                  ) : (
-                                    <View className="w-full items-center justify-center bg-muted" style={{ height: 120 }}>
-                                      <Ionicons name="image-outline" size={24} color={colors.mid} />
-                                    </View>
-                                  )}
-                                  <CardContent className="p-3 gap-1">
-                                    <Text className="text-sm font-semibold text-foreground" numberOfLines={1}>{item.title}</Text>
-                                    <View className="flex-row items-center justify-between">
-                                      <Text className="text-sm font-bold" style={{ color: colors.primary }}>
-                                        {item.is_free ? "Free" : item.price != null ? `$${item.price}` : "—"}
-                                      </Text>
-                                      {item.status === "sold" && <Badge variant="destructive"><Text>SOLD</Text></Badge>}
-                                    </View>
-                                  </CardContent>
-                                </Pressable>
-                                <View className="px-3 pb-2">
-                                  <Pressable className="flex-row items-center gap-1 self-end p-1 rounded hover:bg-muted" onPress={() => deleteListing(item.id)}>
-                                    <Ionicons name="trash-outline" size={13} color={colors.error} />
-                                    <Text className="text-xs" style={{ color: colors.error }}>Delete</Text>
-                                  </Pressable>
-                                </View>
-                              </Card>
-                            ))}
-                          </div>
-                        )
+                    <View>
+                      <Separator className="my-3" />
+                      <ProfileInfoRow icon="mail-outline" label={user?.email ?? ""} />
+                      {profile && profile.rating_count > 0 && (
+                        <ProfileInfoRow icon="star-outline" label={`${profile.rating_avg.toFixed(1)} avg (${profile.rating_count} reviews)`} />
                       )}
-
-                      {/* Services */}
-                      {contentTab === "services" && (
-                        services.length === 0 ? (
-                          <View className="items-center py-10">
-                            <Ionicons name="construct-outline" size={24} color={colors.mid} />
-                            <Text className="text-sm text-muted-foreground mt-2">No services yet</Text>
-                          </View>
-                        ) : (
-                          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12 }}>
-                            {services.map((item) => (
-                              <Card key={item.id} className="overflow-hidden transition-shadow hover:shadow-lg">
-                                <Pressable onPress={() => router.push(`/service/${item.id}`)}>
-                                  {item.image_url ? (
-                                    <Image source={{ uri: API.mediaUrl(item.image_url) }} style={{ width: "100%" as any, height: 120 }} resizeMode="cover" />
-                                  ) : (
-                                    <View className="w-full items-center justify-center bg-muted" style={{ height: 120 }}>
-                                      <Ionicons name="construct-outline" size={24} color={colors.mid} />
-                                    </View>
-                                  )}
-                                  <CardContent className="p-3 gap-1">
-                                    <Text className="text-sm font-semibold text-foreground" numberOfLines={1}>{item.title}</Text>
-                                    <Text className="text-sm font-bold" style={{ color: colors.primary }}>
-                                      {item.price != null ? `$${item.price}${item.price_type === "hourly" ? "/hr" : ""}` : "Free"}
-                                    </Text>
-                                  </CardContent>
-                                </Pressable>
-                                <View className="px-3 pb-2">
-                                  <Pressable className="flex-row items-center gap-1 self-end p-1 rounded hover:bg-muted" onPress={() => deleteService(item.id)}>
-                                    <Ionicons name="trash-outline" size={13} color={colors.error} />
-                                    <Text className="text-xs" style={{ color: colors.error }}>Delete</Text>
-                                  </Pressable>
-                                </View>
-                              </Card>
-                            ))}
-                          </div>
-                        )
-                      )}
-
-                      {/* Events */}
-                      {contentTab === "events" && (
-                        events.length === 0 ? (
-                          <View className="items-center py-10">
-                            <Ionicons name="calendar-outline" size={24} color={colors.mid} />
-                            <Text className="text-sm text-muted-foreground mt-2">No events yet</Text>
-                          </View>
-                        ) : (
-                          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12 }}>
-                            {events.map((item) => (
-                              <Card key={item.id} className="overflow-hidden transition-shadow hover:shadow-lg">
-                                <Pressable onPress={() => router.push(`/event/${item.id}`)}>
-                                  {item.image_url ? (
-                                    <Image source={{ uri: API.mediaUrl(item.image_url) }} style={{ width: "100%" as any, height: 120 }} resizeMode="cover" />
-                                  ) : (
-                                    <View className="w-full items-center justify-center bg-muted" style={{ height: 120 }}>
-                                      <Ionicons name="calendar-outline" size={24} color={colors.mid} />
-                                    </View>
-                                  )}
-                                  <CardContent className="p-3 gap-1">
-                                    <Text className="text-sm font-semibold text-foreground" numberOfLines={1}>{item.title}</Text>
-                                    <Text className="text-xs text-muted-foreground">{fmtDate(item.starts_at)}</Text>
-                                    <Text className="text-sm font-bold" style={{ color: item.is_free ? colors.success : colors.primary }}>
-                                      {item.is_free ? "Free" : item.ticket_price != null ? `$${item.ticket_price}` : "Paid"}
-                                    </Text>
-                                  </CardContent>
-                                </Pressable>
-                                <View className="px-3 pb-2">
-                                  <Pressable className="flex-row items-center gap-1 self-end p-1 rounded hover:bg-muted" onPress={() => deleteEvent(item.id)}>
-                                    <Ionicons name="trash-outline" size={13} color={colors.error} />
-                                    <Text className="text-xs" style={{ color: colors.error }}>Delete</Text>
-                                  </Pressable>
-                                </View>
-                              </Card>
-                            ))}
-                          </div>
-                        )
-                      )}
-                    </CardContent>
-                  </Card>
-                </View>
+                    </View>
+                  </CardContent>
+                </Card>
               </View>
 
-              {/* ── Reviews & Ratings — full width row ── */}
-              <View className="px-4 pb-8">
+              {/* Right column — Tabbed content */}
+              <View style={{ flex: 1, minWidth: 300 }}>
                 <Card>
-                  <CardHeader>
-                    <View className="flex-row items-center justify-between">
-                      <View className="flex-row items-center gap-2">
-                        <Text className="text-base font-bold text-foreground">Reviews & Ratings</Text>
-                        {profile && profile.rating_count > 0 && (
-                          <View className="flex-row items-center gap-1 px-2 py-0.5 rounded-full" style={{ backgroundColor: colors.primaryLight }}>
-                            <Ionicons name="star" size={12} color={colors.primary} />
-                            <Text className="text-xs font-semibold" style={{ color: colors.primary }}>
-                              {profile.rating_avg.toFixed(1)} ({profile.rating_count})
-                            </Text>
-                          </View>
-                        )}
-                      </View>
-                    </View>
-                  </CardHeader>
-                  <CardContent>
-                    {(!profile || profile.rating_count === 0) ? (
-                      <View className="items-center py-10">
-                        <View className="flex-row gap-1 mb-3">
-                          {[1, 2, 3, 4, 5].map((i) => (
-                            <Ionicons key={i} name="star-outline" size={24} color={colors.border} />
-                          ))}
-                        </View>
-                        <Text className="text-sm font-medium text-muted-foreground">No reviews yet</Text>
-                        <Text className="text-xs text-muted-foreground mt-1 text-center" style={{ maxWidth: 320 }}>
-                          When buyers leave reviews on your listings, services, or events, they'll show up here with a star rating and comment.
+                  {/* Tab pills */}
+                  <View className="flex-row gap-1 px-4 pt-4 pb-3 border-b border-border">
+                    {([
+                      { key: "listings" as const, label: "Listings", count: listings.length },
+                      { key: "services" as const, label: "Services", count: services.length },
+                      { key: "events" as const, label: "Events", count: events.length },
+                    ]).map(({ key, label, count }) => (
+                      <Pressable
+                        key={key}
+                        className="px-4 py-2 rounded-full"
+                        style={contentTab === key ? { backgroundColor: colors.primaryLight } : undefined}
+                        onPress={() => setContentTab(key)}
+                      >
+                        <Text className="text-sm font-semibold" style={{ color: contentTab === key ? colors.primary : colors.dark }}>
+                          {label} ({count})
                         </Text>
-                      </View>
-                    ) : (
-                      <View className="gap-4">
-                        {/* Rating summary bar */}
-                        <View className="flex-row items-center gap-6 pb-4 border-b border-border">
-                          <View className="items-center">
-                            <Text className="text-4xl font-bold text-foreground">{profile.rating_avg.toFixed(1)}</Text>
-                            <View className="flex-row gap-0.5 mt-1">
-                              {[1, 2, 3, 4, 5].map((i) => (
-                                <Ionicons
-                                  key={i}
-                                  name={i <= Math.round(profile.rating_avg) ? "star" : "star-outline"}
-                                  size={14}
-                                  color={i <= Math.round(profile.rating_avg) ? colors.primary : colors.border}
-                                />
-                              ))}
-                            </View>
-                            <Text className="text-xs text-muted-foreground mt-1">{profile.rating_count} reviews</Text>
-                          </View>
-                          {/* Rating distribution bars */}
-                          <View className="flex-1 gap-1.5">
-                            {[5, 4, 3, 2, 1].map((star) => (
-                              <View key={star} className="flex-row items-center gap-2">
-                                <Text className="text-xs text-muted-foreground w-3">{star}</Text>
-                                <Ionicons name="star" size={10} color={colors.primary} />
-                                <View className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-                                  <View className="h-2 rounded-full" style={{ width: "0%", backgroundColor: colors.primary }} />
-                                </View>
-                              </View>
-                            ))}
-                          </View>
+                      </Pressable>
+                    ))}
+                  </View>
+
+                  <CardContent className="pt-4">
+                    {/* Listings */}
+                    {contentTab === "listings" && (
+                      listings.length === 0 ? (
+                        <View className="items-center py-10">
+                          <Ionicons name="pricetag-outline" size={24} color={colors.mid} />
+                          <Text className="text-sm text-muted-foreground mt-2">No listings yet</Text>
                         </View>
-                        <Text className="text-xs text-muted-foreground text-center">Individual reviews will appear here</Text>
-                      </View>
+                      ) : (
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12 }}>
+                          {listings.map((item) => (
+                            <Card key={item.id} className="overflow-hidden transition-shadow hover:shadow-lg">
+                              <Pressable onPress={() => router.push(`/listing/${item.id}`)}>
+                                {item.image_url ? (
+                                  <Image source={{ uri: API.mediaUrl(item.image_url) }} style={{ width: "100%" as any, height: 120 }} resizeMode="cover" />
+                                ) : (
+                                  <View className="w-full items-center justify-center bg-muted" style={{ height: 120 }}>
+                                    <Ionicons name="image-outline" size={24} color={colors.mid} />
+                                  </View>
+                                )}
+                                <CardContent className="p-3 gap-1">
+                                  <Text className="text-sm font-semibold text-foreground" numberOfLines={1}>{item.title}</Text>
+                                  <View className="flex-row items-center justify-between">
+                                    <Text className="text-sm font-bold" style={{ color: colors.primary }}>
+                                      {item.is_free ? "Free" : item.price != null ? `$${item.price}` : "—"}
+                                    </Text>
+                                    {item.status === "sold" && <Badge variant="destructive"><Text>SOLD</Text></Badge>}
+                                  </View>
+                                </CardContent>
+                              </Pressable>
+                              <View className="px-3 pb-2">
+                                <Pressable className="flex-row items-center gap-1 self-end p-1 rounded hover:bg-muted" onPress={() => deleteListing(item.id)}>
+                                  <Ionicons name="trash-outline" size={13} color={colors.error} />
+                                  <Text className="text-xs" style={{ color: colors.error }}>Delete</Text>
+                                </Pressable>
+                              </View>
+                            </Card>
+                          ))}
+                        </div>
+                      )
+                    )}
+
+                    {/* Services */}
+                    {contentTab === "services" && (
+                      services.length === 0 ? (
+                        <View className="items-center py-10">
+                          <Ionicons name="construct-outline" size={24} color={colors.mid} />
+                          <Text className="text-sm text-muted-foreground mt-2">No services yet</Text>
+                        </View>
+                      ) : (
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12 }}>
+                          {services.map((item) => (
+                            <Card key={item.id} className="overflow-hidden transition-shadow hover:shadow-lg">
+                              <Pressable onPress={() => router.push(`/service/${item.id}`)}>
+                                {item.image_url ? (
+                                  <Image source={{ uri: API.mediaUrl(item.image_url) }} style={{ width: "100%" as any, height: 120 }} resizeMode="cover" />
+                                ) : (
+                                  <View className="w-full items-center justify-center bg-muted" style={{ height: 120 }}>
+                                    <Ionicons name="construct-outline" size={24} color={colors.mid} />
+                                  </View>
+                                )}
+                                <CardContent className="p-3 gap-1">
+                                  <Text className="text-sm font-semibold text-foreground" numberOfLines={1}>{item.title}</Text>
+                                  <Text className="text-sm font-bold" style={{ color: colors.primary }}>
+                                    {item.price != null ? `$${item.price}${item.price_type === "hourly" ? "/hr" : ""}` : "Free"}
+                                  </Text>
+                                </CardContent>
+                              </Pressable>
+                              <View className="px-3 pb-2">
+                                <Pressable className="flex-row items-center gap-1 self-end p-1 rounded hover:bg-muted" onPress={() => deleteService(item.id)}>
+                                  <Ionicons name="trash-outline" size={13} color={colors.error} />
+                                  <Text className="text-xs" style={{ color: colors.error }}>Delete</Text>
+                                </Pressable>
+                              </View>
+                            </Card>
+                          ))}
+                        </div>
+                      )
+                    )}
+
+                    {/* Events */}
+                    {contentTab === "events" && (
+                      events.length === 0 ? (
+                        <View className="items-center py-10">
+                          <Ionicons name="calendar-outline" size={24} color={colors.mid} />
+                          <Text className="text-sm text-muted-foreground mt-2">No events yet</Text>
+                        </View>
+                      ) : (
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12 }}>
+                          {events.map((item) => (
+                            <Card key={item.id} className="overflow-hidden transition-shadow hover:shadow-lg">
+                              <Pressable onPress={() => router.push(`/event/${item.id}`)}>
+                                {item.image_url ? (
+                                  <Image source={{ uri: API.mediaUrl(item.image_url) }} style={{ width: "100%" as any, height: 120 }} resizeMode="cover" />
+                                ) : (
+                                  <View className="w-full items-center justify-center bg-muted" style={{ height: 120 }}>
+                                    <Ionicons name="calendar-outline" size={24} color={colors.mid} />
+                                  </View>
+                                )}
+                                <CardContent className="p-3 gap-1">
+                                  <Text className="text-sm font-semibold text-foreground" numberOfLines={1}>{item.title}</Text>
+                                  <Text className="text-xs text-muted-foreground">{fmtDate(item.starts_at)}</Text>
+                                  <Text className="text-sm font-bold" style={{ color: item.is_free ? colors.success : colors.primary }}>
+                                    {item.is_free ? "Free" : item.ticket_price != null ? `$${item.ticket_price}` : "Paid"}
+                                  </Text>
+                                </CardContent>
+                              </Pressable>
+                              <View className="px-3 pb-2">
+                                <Pressable className="flex-row items-center gap-1 self-end p-1 rounded hover:bg-muted" onPress={() => deleteEvent(item.id)}>
+                                  <Ionicons name="trash-outline" size={13} color={colors.error} />
+                                  <Text className="text-xs" style={{ color: colors.error }}>Delete</Text>
+                                </Pressable>
+                              </View>
+                            </Card>
+                          ))}
+                        </div>
+                      )
                     )}
                   </CardContent>
                 </Card>
               </View>
+            </View>
+
+            {/* ── Reviews & Ratings — full width row ── */}
+            <View className="px-4 pb-8">
+              <Card>
+                <CardHeader>
+                  <View className="flex-row items-center justify-between">
+                    <View className="flex-row items-center gap-2">
+                      <Text className="text-base font-bold text-foreground">Reviews & Ratings</Text>
+                      {profile && profile.rating_count > 0 && (
+                        <View className="flex-row items-center gap-1 px-2 py-0.5 rounded-full" style={{ backgroundColor: colors.primaryLight }}>
+                          <Ionicons name="star" size={12} color={colors.primary} />
+                          <Text className="text-xs font-semibold" style={{ color: colors.primary }}>
+                            {profile.rating_avg.toFixed(1)} ({profile.rating_count})
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  </View>
+                </CardHeader>
+                <CardContent>
+                  {(!profile || profile.rating_count === 0) ? (
+                    <View className="items-center py-10">
+                      <View className="flex-row gap-1 mb-3">
+                        {[1, 2, 3, 4, 5].map((i) => (
+                          <Ionicons key={i} name="star-outline" size={24} color={colors.border} />
+                        ))}
+                      </View>
+                      <Text className="text-sm font-medium text-muted-foreground">No reviews yet</Text>
+                      <Text className="text-xs text-muted-foreground mt-1 text-center" style={{ maxWidth: 320 }}>
+                        When buyers leave reviews on your listings, services, or events, they'll show up here with a star rating and comment.
+                      </Text>
+                    </View>
+                  ) : (
+                    <View className="gap-4">
+                      {/* Rating summary bar */}
+                      <View className="flex-row items-center gap-6 pb-4 border-b border-border">
+                        <View className="items-center">
+                          <Text className="text-4xl font-bold text-foreground">{profile.rating_avg.toFixed(1)}</Text>
+                          <View className="flex-row gap-0.5 mt-1">
+                            {[1, 2, 3, 4, 5].map((i) => (
+                              <Ionicons
+                                key={i}
+                                name={i <= Math.round(profile.rating_avg) ? "star" : "star-outline"}
+                                size={14}
+                                color={i <= Math.round(profile.rating_avg) ? colors.primary : colors.border}
+                              />
+                            ))}
+                          </View>
+                          <Text className="text-xs text-muted-foreground mt-1">{profile.rating_count} reviews</Text>
+                        </View>
+                        {/* Rating distribution bars */}
+                        <View className="flex-1 gap-1.5">
+                          {[5, 4, 3, 2, 1].map((star) => (
+                            <View key={star} className="flex-row items-center gap-2">
+                              <Text className="text-xs text-muted-foreground w-3">{star}</Text>
+                              <Ionicons name="star" size={10} color={colors.primary} />
+                              <View className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                                <View className="h-2 rounded-full" style={{ width: "0%", backgroundColor: colors.primary }} />
+                              </View>
+                            </View>
+                          ))}
+                        </View>
+                      </View>
+                      <Text className="text-xs text-muted-foreground text-center">Individual reviews will appear here</Text>
+                    </View>
+                  )}
+                </CardContent>
+              </Card>
+            </View>
           </View>
         </View>
       </ScrollView>
@@ -534,6 +506,13 @@ export default function ProfileScreen() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <CreatePostModal
+        visible={modalVisible}
+        onClose={closeModal}
+        onSaved={handleSaved}
+        token={token}
+      />
     </View>
   );
 }
