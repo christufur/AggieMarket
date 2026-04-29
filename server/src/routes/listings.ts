@@ -2,7 +2,7 @@ import { Elysia } from "elysia";
 import { jwt } from "@elysiajs/jwt";
 import db from "../db";
 import crypto from "crypto";
-import { requireAuth, parsePagination } from "../utils/auth";
+import { requireAuth } from "../utils/auth";
 
 type PatchListingBody = {
     title?: string;
@@ -283,16 +283,26 @@ const listingsRoutes = new Elysia()
 
         const transactionId = crypto.randomUUID();
 
-        db.run(`
-            INSERT INTO transactions (id, listing_id, seller_id, buyer_id, sold_at)
-            VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
-        `, [transactionId, params.id, payload.id, normalizedBuyerId]);
+        try {
+            db.transaction(() => {
+                db.run(`
+                    INSERT INTO transactions (id, listing_id, seller_id, buyer_id, sold_at)
+                    VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+                `, [transactionId, params.id, payload.id, normalizedBuyerId]);
 
-        db.run(`
-            UPDATE listings
-            SET status = 'sold', updated_at = CURRENT_TIMESTAMP
-            WHERE id = ?
-        `, [params.id]);
+                db.run(`
+                    UPDATE listings
+                    SET status = 'sold', updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ? AND status != 'sold'
+                `, [params.id]);
+            })();
+        } catch (err: any) {
+            // UNIQUE(listing_id) on transactions catches concurrent mark-sold races.
+            if (String(err?.message ?? "").includes("UNIQUE")) {
+                return { message: "A transaction already exists for this listing", status: 409 };
+            }
+            throw err;
+        }
 
         const transaction = db.query(`
             SELECT *

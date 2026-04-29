@@ -322,13 +322,6 @@ db.run(`
   );
 `);
 
-// is_admin column on users (TASK-9 admin moderation)
-try {
-  db.run(`ALTER TABLE users ADD COLUMN is_admin INTEGER DEFAULT 0`);
-} catch {
-  // column already exists
-}
-
 // Seed version tracking (TASK-6 idempotent seed)
 db.run(`
   CREATE TABLE IF NOT EXISTS seed_meta (

@@ -1,11 +1,12 @@
 import { Elysia } from "elysia"
 import { jwt } from "@elysiajs/jwt"
+import crypto from "crypto";
 import db from "../db";
 import { sendVerificationEmail } from "../utils/email";
 
 const isValidEmail = (email: string) => email.endsWith("@nmsu.edu");
 
-const generateToken = () => Math.floor(100000 + Math.random() * 900000).toString();
+const generateToken = () => crypto.randomInt(100000, 1000000).toString();
 
 const authRoutes = new Elysia()
     .use(jwt({ name: "jwt", secret: process.env.JWT_SECRET! }))

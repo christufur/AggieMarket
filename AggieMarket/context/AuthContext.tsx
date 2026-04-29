@@ -34,7 +34,7 @@ async function registerPushToken(authToken: string) {
       "Content-Type": "application/json",
       Authorization: `Bearer ${authToken}`,
     },
-    body: JSON.stringify({ token: expoPushToken, platform: "ios" }),
+    body: JSON.stringify({ token: expoPushToken, platform: Platform.OS }),
   });
 }
 

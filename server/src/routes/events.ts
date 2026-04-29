@@ -197,22 +197,31 @@ const eventsRoutes = new Elysia()
             return { message: "status must be 'going' or 'interested'", status: 400 };
         }
 
-        // Check capacity before allowing RSVP
-        if (event.max_attendees != null) {
-            const existing = db.query("SELECT id FROM event_attendees WHERE event_id = ? AND user_id = ?").get(params.id, payload.id);
-            if (!existing) {
-                const current = db.query("SELECT COUNT(*) as count FROM event_attendees WHERE event_id = ?").get(params.id) as { count: number };
-                if (current.count >= event.max_attendees) {
-                    return { message: "Event is at capacity", status: 409 };
+        // Capacity check + insert wrapped in a transaction so concurrent RSVPs
+        // can't both pass the count check and exceed max_attendees.
+        let atCapacity = false;
+        db.transaction(() => {
+            if (event.max_attendees != null) {
+                const existing = db.query("SELECT id FROM event_attendees WHERE event_id = ? AND user_id = ?").get(params.id, payload.id);
+                if (!existing) {
+                    const current = db.query("SELECT COUNT(*) as count FROM event_attendees WHERE event_id = ?").get(params.id) as { count: number };
+                    if (current.count >= event.max_attendees) {
+                        atCapacity = true;
+                        return;
+                    }
                 }
             }
-        }
 
-        db.run(
-            `INSERT INTO event_attendees (event_id, user_id, status) VALUES (?, ?, ?)
-             ON CONFLICT(event_id, user_id) DO UPDATE SET status = excluded.status`,
-            [params.id, payload.id, status]
-        );
+            db.run(
+                `INSERT INTO event_attendees (event_id, user_id, status) VALUES (?, ?, ?)
+                 ON CONFLICT(event_id, user_id) DO UPDATE SET status = excluded.status`,
+                [params.id, payload.id, status]
+            );
+        })();
+
+        if (atCapacity) {
+            return { message: "Event is at capacity", status: 409 };
+        }
 
         const count = db.query("SELECT COUNT(*) as count FROM event_attendees WHERE event_id = ?").get(params.id) as { count: number };
         const rsvp = db.query("SELECT * FROM event_attendees WHERE event_id = ? AND user_id = ?").get(params.id, payload.id);
