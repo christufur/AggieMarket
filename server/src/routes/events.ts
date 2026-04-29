@@ -199,17 +199,16 @@ const eventsRoutes = new Elysia()
 
         // Capacity check + insert wrapped in a transaction so concurrent RSVPs
         // can't both pass the count check and exceed max_attendees.
-        let atCapacity = false;
-        db.transaction(() => {
-            if (event.max_attendees != null) {
-                const existing = db.query("SELECT id FROM event_attendees WHERE event_id = ? AND user_id = ?").get(params.id, payload.id);
-                if (!existing) {
-                    const current = db.query("SELECT COUNT(*) as count FROM event_attendees WHERE event_id = ?").get(params.id) as { count: number };
-                    if (current.count >= event.max_attendees) {
-                        atCapacity = true;
-                        return;
-                    }
-                }
+        type RsvpResult =
+            | { ok: false; reason: "capacity" }
+            | { ok: true; count: number; wasInsert: boolean };
+
+        const result: RsvpResult = db.transaction((): RsvpResult => {
+            const existing = db.query("SELECT id FROM event_attendees WHERE event_id = ? AND user_id = ?").get(params.id, payload.id);
+            const current = db.query("SELECT COUNT(*) as count FROM event_attendees WHERE event_id = ?").get(params.id) as { count: number };
+
+            if (event.max_attendees != null && !existing && current.count >= event.max_attendees) {
+                return { ok: false, reason: "capacity" };
             }
 
             db.run(
@@ -217,15 +216,24 @@ const eventsRoutes = new Elysia()
                  ON CONFLICT(event_id, user_id) DO UPDATE SET status = excluded.status`,
                 [params.id, payload.id, status]
             );
+
+            return {
+                ok: true,
+                count: existing ? current.count : current.count + 1,
+                wasInsert: !existing,
+            };
         })();
 
-        if (atCapacity) {
+        if (!result.ok) {
             return { message: "Event is at capacity", status: 409 };
         }
 
-        const count = db.query("SELECT COUNT(*) as count FROM event_attendees WHERE event_id = ?").get(params.id) as { count: number };
-        const rsvp = db.query("SELECT * FROM event_attendees WHERE event_id = ? AND user_id = ?").get(params.id, payload.id);
-        return { rsvp, count: count.count, status: 201 };
+        const rsvp = {
+            event_id: params.id,
+            user_id: payload.id,
+            status,
+        };
+        return { rsvp, count: result.count, status: 201 };
     })
 
     .delete("/events/:id/rsvp", async ({ params, headers, jwt }) => {

@@ -282,13 +282,14 @@ const listingsRoutes = new Elysia()
         }
 
         const transactionId = crypto.randomUUID();
+        const soldAt = new Date().toISOString();
 
         try {
             db.transaction(() => {
                 db.run(`
                     INSERT INTO transactions (id, listing_id, seller_id, buyer_id, sold_at)
-                    VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
-                `, [transactionId, params.id, payload.id, normalizedBuyerId]);
+                    VALUES (?, ?, ?, ?, ?)
+                `, [transactionId, params.id, payload.id, normalizedBuyerId, soldAt]);
 
                 db.run(`
                     UPDATE listings
@@ -296,19 +297,21 @@ const listingsRoutes = new Elysia()
                     WHERE id = ? AND status != 'sold'
                 `, [params.id]);
             })();
-        } catch (err: any) {
+        } catch (err: unknown) {
             // UNIQUE(listing_id) on transactions catches concurrent mark-sold races.
-            if (String(err?.message ?? "").includes("UNIQUE")) {
+            if ((err as { code?: string })?.code === "SQLITE_CONSTRAINT_UNIQUE") {
                 return { message: "A transaction already exists for this listing", status: 409 };
             }
             throw err;
         }
 
-        const transaction = db.query(`
-            SELECT *
-            FROM transactions
-            WHERE id = ?
-        `).get(transactionId);
+        const transaction = {
+            id: transactionId,
+            listing_id: params.id,
+            seller_id: Number(payload.id),
+            buyer_id: normalizedBuyerId,
+            sold_at: soldAt,
+        };
 
         return { transaction, status: 201 };
     })
