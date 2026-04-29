@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
-import { View, ScrollView, ActivityIndicator, Pressable } from "react-native";
+import { View, ScrollView, ActivityIndicator, Pressable, Image, Platform } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/context/AuthContext";
-import { useWebSocket } from "@/context/WebSocketContext";
 import { API } from "@/constants/api";
 import { Text } from "@/components/ui/text";
 import { Button } from "@/components/ui/button";
@@ -18,6 +17,10 @@ import {
 import { PRICE_TYPES, SERVICE_CATEGORIES } from "@/constants/categories";
 import { colors } from "@/theme/colors";
 import { priceLabel } from "@/lib/utils";
+import { SiteHeader, NavAvatar } from "@/components/ui/SiteHeader";
+import { BottomNav } from "@/components/ui/BottomNav";
+import { useWebSocket } from "@/context/WebSocketContext";
+import { confirmAsync } from "@/lib/dialogs";
 
 type ServiceDetail = {
   id: string;
@@ -36,10 +39,10 @@ type ServiceDetail = {
 };
 
 export default function ServiceDetailScreenWeb() {
+  const _ws = useWebSocket();
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { user, token } = useAuth();
-  const { unreadCount } = useWebSocket();
   const [service, setService] = useState<ServiceDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -49,6 +52,7 @@ export default function ServiceDetailScreenWeb() {
   const [msgText, setMsgText] = useState("");
   const [msgSending, setMsgSending] = useState(false);
   const [msgError, setMsgError] = useState("");
+  const [msgBoxOpen, setMsgBoxOpen] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -197,82 +201,36 @@ export default function ServiceDetailScreenWeb() {
   const isOwner = String(service.provider_id) === String(user?.id);
 
   return (
-    <ScrollView
-      className="flex-1 bg-background"
-      contentContainerStyle={{ minHeight: "100vh" as any }}
-    >
-      {/* Nav */}
-      <View className="bg-card border-b border-border px-6 py-3">
-        <View className="flex-row items-center justify-between" style={{ maxWidth: 1100, marginHorizontal: "auto", width: "100%" }}>
-          <View className="flex-row items-center gap-3">
-            <Pressable onPress={() => router.push("/home")} className="flex-row items-center gap-1.5">
-              <View className="bg-primary rounded px-1.5 py-0.5">
-                <Text className="text-xs font-bold text-primary-foreground">AM</Text>
-              </View>
-              <Text className="text-sm font-semibold text-foreground">Home</Text>
-            </Pressable>
-            <Ionicons name="chevron-forward" size={12} color={colors.mid} />
-            <Text className="text-sm text-muted-foreground">Service</Text>
-          </View>
-          <View className="flex-row items-center gap-2">
-            <Pressable className="w-9 h-9 border-[1.5px] border-border rounded-lg items-center justify-center" onPress={() => router.push("/saved")}>
-              <Ionicons name="heart-outline" size={16} color={colors.dark} />
-            </Pressable>
-            <Pressable className="w-9 h-9 border-[1.5px] border-border rounded-lg items-center justify-center" onPress={() => router.push("/inbox")} style={{ position: "relative" as any }}>
-              <Ionicons name="chatbubble-outline" size={16} color={colors.dark} />
-              {unreadCount > 0 && (
-                <View style={{
-                  position: "absolute", top: -4, right: -4,
-                  backgroundColor: colors.primary, borderRadius: 100,
-                  minWidth: 16, height: 16, paddingHorizontal: 3,
-                  alignItems: "center", justifyContent: "center",
-                  borderWidth: 1.5, borderColor: colors.white,
-                }}>
-                  <Text style={{ color: colors.white, fontSize: 9, fontWeight: "700" }}>
-                    {unreadCount > 99 ? "99+" : unreadCount}
-                  </Text>
-                </View>
-              )}
-            </Pressable>
-            <Pressable className="w-9 h-9 border-[1.5px] border-border rounded-lg items-center justify-center" onPress={() => router.push("/profile")}>
-              <Ionicons name="person-outline" size={16} color={colors.dark} />
-            </Pressable>
-          </View>
-        </View>
-      </View>
-
+    <View style={{ flex: 1, backgroundColor: colors.bg, minHeight: "100vh" as any }}>
+      <SiteHeader crumb="Service" showSearch={false} />
+      <ScrollView className="flex-1 bg-background">
       <View
         className="px-6 py-8"
-        style={{ maxWidth: 900, width: "100%", alignSelf: "center" }}
+        style={{ maxWidth: 1100, width: "100%", alignSelf: "center" }}
       >
         <View className="flex-row gap-8" style={{ flexWrap: "wrap" }}>
           {/* Image section */}
           <View style={{ width: "100%", maxWidth: 440, flexShrink: 0 }}>
             {images.length > 0 ? (
               <View>
-                <div
+                <View
                   style={{
-                    width: "100%",
+                    width: "100%" as any,
                     maxWidth: 440,
                     height: 400,
                     borderRadius: 12,
                     overflow: "hidden",
-                    background: colors.bg,
-                    display: "flex",
+                    backgroundColor: colors.bg,
                     alignItems: "center",
                     justifyContent: "center",
                   }}
                 >
-                  <img
-                    src={API.mediaUrl(images[imgIdx].url)}
-                    style={{
-                      maxWidth: "100%",
-                      maxHeight: "100%",
-                      objectFit: "contain",
-                    }}
-                    alt={service.title}
+                  <Image
+                    source={{ uri: API.mediaUrl(images[imgIdx].url) }}
+                    style={{ width: "100%" as any, height: "100%" as any }}
+                    resizeMode="contain"
                   />
-                </div>
+                </View>
                 {images.length > 1 && (
                   <View className="mt-3 flex-row gap-2">
                     {images.map((img, i) => (
@@ -288,14 +246,10 @@ export default function ServiceDetailScreenWeb() {
                           borderColor: i === imgIdx ? colors.primary : colors.border,
                         }}
                       >
-                        <img
-                          src={API.mediaUrl(img.url)}
-                          style={{
-                            width: "100%",
-                            height: "100%",
-                            objectFit: "cover",
-                          }}
-                          alt=""
+                        <Image
+                          source={{ uri: API.mediaUrl(img.url) }}
+                          style={{ width: "100%" as any, height: "100%" as any }}
+                          resizeMode="cover"
                         />
                       </Pressable>
                     ))}
@@ -351,15 +305,6 @@ export default function ServiceDetailScreenWeb() {
               <Separator />
 
               <CardContent className="gap-4 pt-4">
-                {service.provider_name && (
-                  <Pressable className="flex-row items-center gap-2" onPress={() => router.push(`/user/${service.provider_id}`)}>
-                    <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: colors.primaryLight, alignItems: "center", justifyContent: "center" }}>
-                      <Ionicons name="person" size={14} color={colors.primary} />
-                    </View>
-                    <Text className="text-sm font-semibold" style={{ color: colors.primary }}>{service.provider_name}</Text>
-                  </Pressable>
-                )}
-
                 {service.availability && (
                   <View>
                     <Text className="mb-1 text-xs font-bold uppercase tracking-wide text-muted-foreground">
@@ -372,10 +317,10 @@ export default function ServiceDetailScreenWeb() {
                 )}
 
                 <View>
-                  <Text className="mb-1 text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                  <Text className="mb-2 text-xs font-bold uppercase tracking-wide text-muted-foreground">
                     Description
                   </Text>
-                  <Text className="text-sm leading-relaxed text-foreground">
+                  <Text style={{ fontSize: 15, lineHeight: 24, color: colors.ink }}>
                     {service.description || "No description provided."}
                   </Text>
                 </View>
@@ -401,7 +346,7 @@ export default function ServiceDetailScreenWeb() {
                       variant="destructive"
                       className="flex-1"
                       onPress={async () => {
-                        if (!window.confirm("Are you sure you want to delete this service?")) return;
+                        if (!(await confirmAsync("Are you sure you want to delete this service?", "Delete service"))) return;
                         await fetch(API.service(service.id), {
                           method: "DELETE",
                           headers: { Authorization: `Bearer ${token}` },
@@ -415,41 +360,113 @@ export default function ServiceDetailScreenWeb() {
                   </View>
                 ) : (
                   <View className="gap-3 mt-2">
-                    <View className="gap-1.5">
-                      <Text className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                        Contact Provider
-                      </Text>
-                      <Textarea
-                        value={msgText}
-                        onChangeText={setMsgText}
-                        placeholder="Hi, I'm interested in your service..."
-                        numberOfLines={3}
-                        editable={!msgSending}
-                      />
-                      {msgError ? (
-                        <Text className="text-xs text-destructive">{msgError}</Text>
-                      ) : null}
-                    </View>
-                    <View className="flex-row items-center gap-3">
-                      <Button
-                        className="flex-1"
-                        onPress={sendFirstMessage}
-                        disabled={msgSending || !msgText.trim()}
+                    {!msgBoxOpen ? (
+                      <View className="flex-row items-center gap-3">
+                        <Button
+                          className="flex-1"
+                          onPress={() => setMsgBoxOpen(true)}
+                          style={{ cursor: "pointer" as any }}
+                        >
+                          <Ionicons name="chatbubble-outline" size={16} color={colors.white} />
+                          <Text className="ml-2 text-sm font-semibold text-primary-foreground">Contact Provider</Text>
+                        </Button>
+                        <Pressable onPress={toggleSave} style={{ width: 44, height: 44, borderRadius: 22, borderWidth: 1, borderColor: colors.border, alignItems: "center", justifyContent: "center", cursor: "pointer" as any }}>
+                          <Ionicons name={saved ? "heart" : "heart-outline"} size={22} color={colors.primary} />
+                        </Pressable>
+                      </View>
+                    ) : (
+                      <>
+                        <View className="gap-1.5">
+                          <View className="flex-row items-center justify-between">
+                            <Text className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                              Contact Provider
+                            </Text>
+                            <Pressable
+                              onPress={() => { setMsgBoxOpen(false); setMsgError(""); }}
+                              style={{ cursor: "pointer" as any }}
+                            >
+                              <Text className="text-xs font-semibold" style={{ color: colors.dark }}>Cancel</Text>
+                            </Pressable>
+                          </View>
+                          <Textarea
+                            value={msgText}
+                            onChangeText={setMsgText}
+                            placeholder="Hi, I'm interested in your service..."
+                            numberOfLines={3}
+                            editable={!msgSending}
+                            autoFocus
+                          />
+                          {msgError ? (
+                            <Text className="text-xs text-destructive">{msgError}</Text>
+                          ) : null}
+                        </View>
+                        <View className="flex-row items-center gap-3">
+                          <Button
+                            className="flex-1"
+                            onPress={sendFirstMessage}
+                            disabled={msgSending || !msgText.trim()}
+                          >
+                            {msgSending ? (
+                              <ActivityIndicator size="small" color={colors.white} />
+                            ) : (
+                              <>
+                                <Ionicons name="send-outline" size={16} color={colors.white} />
+                                <Text className="ml-2 text-sm font-semibold text-primary-foreground">Send</Text>
+                              </>
+                            )}
+                          </Button>
+                          <Pressable onPress={toggleSave} style={{ width: 44, height: 44, borderRadius: 22, borderWidth: 1, borderColor: colors.border, alignItems: "center", justifyContent: "center", cursor: "pointer" as any }}>
+                            <Ionicons name={saved ? "heart" : "heart-outline"} size={22} color={colors.primary} />
+                          </Pressable>
+                        </View>
+                      </>
+                    )}
+                  </View>
+                )}
+
+                {/* Provider card — placed at the bottom for a clean lead-with-details layout */}
+                {service.provider_name && (
+                  <>
+                    <Separator />
+                    <View style={{
+                      backgroundColor: colors.bg,
+                      borderRadius: 12,
+                      padding: 14,
+                      borderWidth: 1,
+                      borderColor: colors.border,
+                      gap: 12,
+                    }}>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                        <NavAvatar name={service.provider_name} size={48} />
+                        <View style={{ flex: 1, gap: 3 }}>
+                          <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+                            <Text style={{ fontSize: 15, fontWeight: "700", color: colors.ink }}>
+                              {service.provider_name}
+                            </Text>
+                            <Ionicons name="shield-checkmark-outline" size={14} color={colors.success} />
+                          </View>
+                          <Text style={{ fontSize: 12, color: colors.dark }}>Service provider</Text>
+                        </View>
+                      </View>
+                      <Pressable
+                        onPress={() => router.push(`/user/${service.provider_id}`)}
+                        style={{
+                          borderWidth: 1.5,
+                          borderColor: colors.primary,
+                          borderRadius: 8,
+                          paddingVertical: 8,
+                          alignItems: "center",
+                          justifyContent: "center",
+                          backgroundColor: colors.white,
+                          cursor: "pointer" as any,
+                        }}
                       >
-                        {msgSending ? (
-                          <ActivityIndicator size="small" color={colors.white} />
-                        ) : (
-                          <>
-                            <Ionicons name="send-outline" size={16} color={colors.white} />
-                            <Text className="ml-2 text-sm font-semibold text-primary-foreground">Send</Text>
-                          </>
-                        )}
-                      </Button>
-                      <Pressable onPress={toggleSave} style={{ width: 44, height: 44, borderRadius: 22, borderWidth: 1, borderColor: colors.border, alignItems: "center", justifyContent: "center" }}>
-                        <Ionicons name={saved ? "heart" : "heart-outline"} size={22} color={colors.primary} />
+                        <Text style={{ color: colors.primary, fontSize: 13, fontWeight: "700" }}>
+                          View Profile
+                        </Text>
                       </Pressable>
                     </View>
-                  </View>
+                  </>
                 )}
               </CardContent>
             </Card>
@@ -522,6 +539,19 @@ export default function ServiceDetailScreenWeb() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </ScrollView>
+      </ScrollView>
+      {Platform.OS !== "web" && (
+        <BottomNav
+          unreadCount={_ws.unreadCount}
+          onPress={(k) => {
+            if (k === "home") router.push("/home");
+            if (k === "browse") router.push("/browse");
+            if (k === "post") router.push("/home");
+            if (k === "inbox") router.push("/inbox");
+            if (k === "me") router.push("/profile");
+          }}
+        />
+      )}
+    </View>
   );
 }

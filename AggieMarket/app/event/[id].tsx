@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
-import { View, ScrollView, ActivityIndicator, Pressable, Linking, Switch } from "react-native";
+import { View, ScrollView, ActivityIndicator, Pressable, Linking, Switch, Image, Platform } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/context/AuthContext";
-import { useWebSocket } from "@/context/WebSocketContext";
 import { API } from "@/constants/api";
 import { Text } from "@/components/ui/text";
 import { Button } from "@/components/ui/button";
@@ -15,6 +14,10 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
+import { SiteHeader, NavAvatar } from "@/components/ui/SiteHeader";
+import { BottomNav } from "@/components/ui/BottomNav";
+import { useWebSocket } from "@/context/WebSocketContext";
+import { confirmAsync } from "@/lib/dialogs";
 
 type EventDetail = {
   id: string;
@@ -30,6 +33,8 @@ type EventDetail = {
   ticket_price: number | null;
   max_attendees: number | null;
   external_link: string | null;
+  organization: string | null;
+  organization_url: string | null;
   status: string;
   view_count: number;
   created_at: string;
@@ -55,10 +60,10 @@ import { EVENT_CATEGORIES } from "@/constants/categories";
 import { colors } from "@/theme/colors";
 
 export default function EventDetailScreenWeb() {
+  const _ws = useWebSocket();
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { user, token } = useAuth();
-  const { unreadCount } = useWebSocket();
   const [event, setEvent] = useState<EventDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -68,6 +73,7 @@ export default function EventDetailScreenWeb() {
   const [msgText, setMsgText] = useState("");
   const [msgSending, setMsgSending] = useState(false);
   const [msgError, setMsgError] = useState("");
+  const [msgBoxOpen, setMsgBoxOpen] = useState(false);
 
   // RSVP state
   const [rsvpStatus, setRsvpStatus] = useState<"going" | "interested" | null>(null);
@@ -86,6 +92,8 @@ export default function EventDetailScreenWeb() {
   const [editTicketPrice, setEditTicketPrice] = useState("");
   const [editMaxAttendees, setEditMaxAttendees] = useState("");
   const [editExternalLink, setEditExternalLink] = useState("");
+  const [editOrganization, setEditOrganization] = useState("");
+  const [editOrganizationUrl, setEditOrganizationUrl] = useState("");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -196,6 +204,8 @@ export default function EventDetailScreenWeb() {
     setEditTicketPrice(event.ticket_price != null ? String(event.ticket_price) : "");
     setEditMaxAttendees(event.max_attendees != null ? String(event.max_attendees) : "");
     setEditExternalLink(event.external_link ?? "");
+    setEditOrganization(event.organization ?? "");
+    setEditOrganizationUrl(event.organization_url ?? "");
     setEditOpen(true);
   };
 
@@ -217,6 +227,8 @@ export default function EventDetailScreenWeb() {
           ticket_price: editIsFree ? null : parseFloat(editTicketPrice) || null,
           max_attendees: editMaxAttendees ? parseInt(editMaxAttendees) : null,
           external_link: editExternalLink.trim() || null,
+          organization: editOrganization.trim() || null,
+          organization_url: editOrganizationUrl.trim() || null,
         }),
       });
       const data = await res.json();
@@ -272,82 +284,36 @@ export default function EventDetailScreenWeb() {
   const isOwner = String(event.organizer_id) === String(user?.id);
 
   return (
-    <ScrollView
-      className="flex-1 bg-background"
-      contentContainerStyle={{ minHeight: "100vh" as any }}
-    >
-      {/* Nav */}
-      <View className="bg-card border-b border-border px-6 py-3">
-        <View className="flex-row items-center justify-between" style={{ maxWidth: 1100, marginHorizontal: "auto", width: "100%" }}>
-          <View className="flex-row items-center gap-3">
-            <Pressable onPress={() => router.push("/home")} className="flex-row items-center gap-1.5">
-              <View className="bg-primary rounded px-1.5 py-0.5">
-                <Text className="text-xs font-bold text-primary-foreground">AM</Text>
-              </View>
-              <Text className="text-sm font-semibold text-foreground">Home</Text>
-            </Pressable>
-            <Ionicons name="chevron-forward" size={12} color={colors.mid} />
-            <Text className="text-sm text-muted-foreground">Event</Text>
-          </View>
-          <View className="flex-row items-center gap-2">
-            <Pressable className="w-9 h-9 border-[1.5px] border-border rounded-lg items-center justify-center" onPress={() => router.push("/saved")}>
-              <Ionicons name="heart-outline" size={16} color={colors.dark} />
-            </Pressable>
-            <Pressable className="w-9 h-9 border-[1.5px] border-border rounded-lg items-center justify-center" onPress={() => router.push("/inbox")} style={{ position: "relative" as any }}>
-              <Ionicons name="chatbubble-outline" size={16} color={colors.dark} />
-              {unreadCount > 0 && (
-                <View style={{
-                  position: "absolute", top: -4, right: -4,
-                  backgroundColor: colors.primary, borderRadius: 100,
-                  minWidth: 16, height: 16, paddingHorizontal: 3,
-                  alignItems: "center", justifyContent: "center",
-                  borderWidth: 1.5, borderColor: colors.white,
-                }}>
-                  <Text style={{ color: colors.white, fontSize: 9, fontWeight: "700" }}>
-                    {unreadCount > 99 ? "99+" : unreadCount}
-                  </Text>
-                </View>
-              )}
-            </Pressable>
-            <Pressable className="w-9 h-9 border-[1.5px] border-border rounded-lg items-center justify-center" onPress={() => router.push("/profile")}>
-              <Ionicons name="person-outline" size={16} color={colors.dark} />
-            </Pressable>
-          </View>
-        </View>
-      </View>
-
+    <View style={{ flex: 1, backgroundColor: colors.bg, minHeight: "100vh" as any }}>
+      <SiteHeader crumb="Event" showSearch={false} />
+      <ScrollView className="flex-1 bg-background">
       <View
         className="px-6 py-8"
-        style={{ maxWidth: 900, width: "100%", alignSelf: "center" }}
+        style={{ maxWidth: 1100, width: "100%", alignSelf: "center" }}
       >
         <View className="flex-row gap-8" style={{ flexWrap: "wrap" }}>
           {/* Image section */}
           <View style={{ width: "100%", maxWidth: 440, flexShrink: 0 }}>
             {images.length > 0 ? (
               <View>
-                <div
+                <View
                   style={{
-                    width: "100%",
+                    width: "100%" as any,
                     maxWidth: 440,
                     height: 400,
                     borderRadius: 12,
                     overflow: "hidden",
-                    background: colors.bg,
-                    display: "flex",
+                    backgroundColor: colors.bg,
                     alignItems: "center",
                     justifyContent: "center",
                   }}
                 >
-                  <img
-                    src={API.mediaUrl(images[imgIdx].url)}
-                    style={{
-                      maxWidth: "100%",
-                      maxHeight: "100%",
-                      objectFit: "contain",
-                    }}
-                    alt={event.title}
+                  <Image
+                    source={{ uri: API.mediaUrl(images[imgIdx].url) }}
+                    style={{ width: "100%" as any, height: "100%" as any }}
+                    resizeMode="contain"
                   />
-                </div>
+                </View>
                 {images.length > 1 && (
                   <View className="mt-3 flex-row gap-2">
                     {images.map((img, i) => (
@@ -363,14 +329,10 @@ export default function EventDetailScreenWeb() {
                           borderColor: i === imgIdx ? colors.primary : colors.border,
                         }}
                       >
-                        <img
-                          src={API.mediaUrl(img.url)}
-                          style={{
-                            width: "100%",
-                            height: "100%",
-                            objectFit: "cover",
-                          }}
-                          alt=""
+                        <Image
+                          source={{ uri: API.mediaUrl(img.url) }}
+                          style={{ width: "100%" as any, height: "100%" as any }}
+                          resizeMode="cover"
                         />
                       </Pressable>
                     ))}
@@ -403,6 +365,24 @@ export default function EventDetailScreenWeb() {
                   </Badge>
                 </View>
 
+                {new Date(event.starts_at).getTime() < Date.now() && (
+                  <View style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 6,
+                    alignSelf: "flex-start",
+                    backgroundColor: colors.dark,
+                    borderRadius: 6,
+                    paddingHorizontal: 8,
+                    paddingVertical: 3,
+                  }}>
+                    <Ionicons name="time-outline" size={12} color={colors.white} />
+                    <Text style={{ color: colors.white, fontSize: 10, fontWeight: "800", letterSpacing: 0.4 }}>
+                      PAST DATE
+                    </Text>
+                  </View>
+                )}
+
                 <View className="flex-row gap-2" style={{ flexWrap: "wrap" }}>
                   {categories.map((c) => (
                     <Badge key={c} variant="secondary">
@@ -415,15 +395,6 @@ export default function EventDetailScreenWeb() {
               <Separator />
 
               <CardContent className="gap-4 pt-4">
-                {event.organizer_name && (
-                  <Pressable className="flex-row items-center gap-2" onPress={() => router.push(`/user/${event.organizer_id}`)}>
-                    <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: colors.primaryLight, alignItems: "center", justifyContent: "center" }}>
-                      <Ionicons name="person" size={14} color={colors.primary} />
-                    </View>
-                    <Text className="text-sm font-semibold" style={{ color: colors.primary }}>{event.organizer_name}</Text>
-                  </Pressable>
-                )}
-
                 <View>
                   <Text className="mb-1 text-xs font-bold uppercase tracking-wide text-muted-foreground">
                     When
@@ -447,6 +418,56 @@ export default function EventDetailScreenWeb() {
                   </Text>
                 </View>
 
+                {event.organization && (
+                  <View>
+                    <Text className="mb-1 text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                      Hosted by
+                    </Text>
+                    {event.organization_url ? (
+                      <Pressable
+                        onPress={() => Linking.openURL(event.organization_url!)}
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          gap: 8,
+                          alignSelf: "flex-start",
+                          paddingVertical: 6,
+                          paddingHorizontal: 10,
+                          borderRadius: 8,
+                          borderWidth: 1,
+                          borderColor: colors.primaryBorder,
+                          backgroundColor: colors.primaryLight,
+                          cursor: "pointer" as any,
+                        }}
+                      >
+                        <Ionicons name="business-outline" size={14} color={colors.primary} />
+                        <Text style={{ fontSize: 13, fontWeight: "700", color: colors.primary }}>
+                          {event.organization}
+                        </Text>
+                        <Ionicons name="open-outline" size={12} color={colors.primary} />
+                      </Pressable>
+                    ) : (
+                      <View style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 8,
+                        alignSelf: "flex-start",
+                        paddingVertical: 6,
+                        paddingHorizontal: 10,
+                        borderRadius: 8,
+                        borderWidth: 1,
+                        borderColor: colors.primaryBorder,
+                        backgroundColor: colors.primaryLight,
+                      }}>
+                        <Ionicons name="business-outline" size={14} color={colors.primary} />
+                        <Text style={{ fontSize: 13, fontWeight: "700", color: colors.primary }}>
+                          {event.organization}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                )}
+
                 {event.max_attendees != null && (
                   <View>
                     <Text className="mb-1 text-xs font-bold uppercase tracking-wide text-muted-foreground">
@@ -469,10 +490,10 @@ export default function EventDetailScreenWeb() {
                 )}
 
                 <View>
-                  <Text className="mb-1 text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                  <Text className="mb-2 text-xs font-bold uppercase tracking-wide text-muted-foreground">
                     Description
                   </Text>
-                  <Text className="text-sm leading-relaxed text-foreground">
+                  <Text style={{ fontSize: 15, lineHeight: 24, color: colors.ink }}>
                     {event.description || "No description provided."}
                   </Text>
                 </View>
@@ -498,7 +519,7 @@ export default function EventDetailScreenWeb() {
                       variant="destructive"
                       className="flex-1"
                       onPress={async () => {
-                        if (!window.confirm("Are you sure you want to delete this event?")) return;
+                        if (!(await confirmAsync("Are you sure you want to delete this event?", "Delete event"))) return;
                         await fetch(API.event(event.id), {
                           method: "DELETE",
                           headers: { Authorization: `Bearer ${token}` },
@@ -516,26 +537,36 @@ export default function EventDetailScreenWeb() {
                       <Button
                         className="flex-1"
                         style={
-                          rsvpStatus
-                            ? { backgroundColor: colors.success }
-                            : event.is_free
+                          new Date(event.starts_at).getTime() < Date.now()
+                            ? { backgroundColor: colors.mid }
+                            : rsvpStatus
                               ? { backgroundColor: colors.success }
-                              : undefined
+                              : event.is_free
+                                ? { backgroundColor: colors.success }
+                                : undefined
                         }
                         onPress={toggleRsvp}
-                        disabled={rsvpLoading}
+                        disabled={rsvpLoading || new Date(event.starts_at).getTime() < Date.now()}
                       >
                         <Ionicons
-                          name={rsvpStatus ? "checkmark-circle" : "calendar-outline"}
+                          name={
+                            new Date(event.starts_at).getTime() < Date.now()
+                              ? "time-outline"
+                              : rsvpStatus
+                                ? "checkmark-circle"
+                                : "calendar-outline"
+                          }
                           size={16}
                           color={colors.white}
                         />
                         <Text className="ml-2 text-sm font-semibold text-primary-foreground">
-                          {rsvpStatus
-                            ? "RSVP'd — Going"
-                            : event.is_free
-                              ? "RSVP — Free"
-                              : `Get Tickets · ${ticketLabel}`}
+                          {new Date(event.starts_at).getTime() < Date.now()
+                            ? "Past the date"
+                            : rsvpStatus
+                              ? "RSVP'd — Going"
+                              : event.is_free
+                                ? "RSVP — Free"
+                                : `Get Tickets · ${ticketLabel}`}
                         </Text>
                       </Button>
                       <Pressable onPress={toggleSave} style={{ width: 44, height: 44, borderRadius: 22, borderWidth: 1, borderColor: colors.border, alignItems: "center", justifyContent: "center" }}>
@@ -553,36 +584,100 @@ export default function EventDetailScreenWeb() {
                         </Text>
                       </Button>
                     )}
-                    <View className="gap-1.5">
-                      <Text className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                        Message Organizer
-                      </Text>
-                      <Textarea
-                        value={msgText}
-                        onChangeText={setMsgText}
-                        placeholder="Hi, I have a question about this event..."
-                        numberOfLines={3}
-                        editable={!msgSending}
-                      />
-                      {msgError ? (
-                        <Text className="text-xs text-destructive">{msgError}</Text>
-                      ) : null}
+                    {!msgBoxOpen ? (
                       <Button
                         variant="outline"
-                        onPress={sendFirstMessage}
-                        disabled={msgSending || !msgText.trim()}
+                        onPress={() => setMsgBoxOpen(true)}
+                        style={{ cursor: "pointer" as any }}
                       >
-                        {msgSending ? (
-                          <ActivityIndicator size="small" color={colors.primary} />
-                        ) : (
-                          <>
-                            <Ionicons name="send-outline" size={16} color={colors.primary} />
-                            <Text className="ml-2 text-sm font-semibold" style={{ color: colors.primary }}>Send Message</Text>
-                          </>
-                        )}
+                        <Ionicons name="chatbubble-outline" size={16} color={colors.primary} />
+                        <Text className="ml-2 text-sm font-semibold" style={{ color: colors.primary }}>Message Organizer</Text>
                       </Button>
-                    </View>
+                    ) : (
+                      <View className="gap-1.5">
+                        <View className="flex-row items-center justify-between">
+                          <Text className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                            Message Organizer
+                          </Text>
+                          <Pressable
+                            onPress={() => { setMsgBoxOpen(false); setMsgError(""); }}
+                            style={{ cursor: "pointer" as any }}
+                          >
+                            <Text className="text-xs font-semibold" style={{ color: colors.dark }}>Cancel</Text>
+                          </Pressable>
+                        </View>
+                        <Textarea
+                          value={msgText}
+                          onChangeText={setMsgText}
+                          placeholder="Hi, I have a question about this event..."
+                          numberOfLines={3}
+                          editable={!msgSending}
+                          autoFocus
+                        />
+                        {msgError ? (
+                          <Text className="text-xs text-destructive">{msgError}</Text>
+                        ) : null}
+                        <Button
+                          onPress={sendFirstMessage}
+                          disabled={msgSending || !msgText.trim()}
+                        >
+                          {msgSending ? (
+                            <ActivityIndicator size="small" color={colors.white} />
+                          ) : (
+                            <>
+                              <Ionicons name="send-outline" size={16} color={colors.white} />
+                              <Text className="ml-2 text-sm font-semibold text-primary-foreground">Send</Text>
+                            </>
+                          )}
+                        </Button>
+                      </View>
+                    )}
                   </View>
+                )}
+
+                {/* Organizer card — placed at the bottom for a clean lead-with-details layout */}
+                {event.organizer_name && (
+                  <>
+                    <Separator />
+                    <View style={{
+                      backgroundColor: colors.bg,
+                      borderRadius: 12,
+                      padding: 14,
+                      borderWidth: 1,
+                      borderColor: colors.border,
+                      gap: 12,
+                    }}>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                        <NavAvatar name={event.organizer_name} size={48} />
+                        <View style={{ flex: 1, gap: 3 }}>
+                          <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+                            <Text style={{ fontSize: 15, fontWeight: "700", color: colors.ink }}>
+                              {event.organizer_name}
+                            </Text>
+                            <Ionicons name="shield-checkmark-outline" size={14} color={colors.success} />
+                          </View>
+                          <Text style={{ fontSize: 12, color: colors.dark }}>Event organizer</Text>
+                        </View>
+                      </View>
+                      <Pressable
+                        onPress={() => router.push(`/user/${event.organizer_id}`)}
+                        style={{
+                          borderWidth: 1.5,
+                          borderColor: colors.primary,
+                          borderRadius: 8,
+                          paddingVertical: 8,
+                          alignItems: "center",
+                          justifyContent: "center",
+                          backgroundColor: colors.white,
+                          cursor: "pointer" as any,
+                        }}
+                      >
+                        <Text style={{ color: colors.primary, fontSize: 13, fontWeight: "700" }}>
+                          View Profile
+                        </Text>
+                      </Pressable>
+                    </View>
+                  </>
                 )}
               </CardContent>
             </Card>
@@ -661,6 +756,26 @@ export default function EventDetailScreenWeb() {
                 <Text className="text-sm font-medium text-foreground">Registration / Event Link</Text>
                 <Input value={editExternalLink} onChangeText={setEditExternalLink} placeholder="https://example.com/register" />
               </View>
+              <View className="gap-1.5">
+                <Text className="text-sm font-medium text-foreground">Organization (optional)</Text>
+                <Input
+                  value={editOrganization}
+                  onChangeText={setEditOrganization}
+                  placeholder="e.g. ACM Student Chapter"
+                />
+                <Text style={{ fontSize: 11, color: colors.dark }}>
+                  The club, department, or org hosting this event.
+                </Text>
+              </View>
+              <View className="gap-1.5">
+                <Text className="text-sm font-medium text-foreground">Organization website (optional)</Text>
+                <Input
+                  value={editOrganizationUrl}
+                  onChangeText={setEditOrganizationUrl}
+                  placeholder="https://example.org"
+                  autoCapitalize="none"
+                />
+              </View>
             </View>
           </ScrollView>
           <DialogFooter>
@@ -673,6 +788,19 @@ export default function EventDetailScreenWeb() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </ScrollView>
+      </ScrollView>
+      {Platform.OS !== "web" && (
+        <BottomNav
+          unreadCount={_ws.unreadCount}
+          onPress={(k) => {
+            if (k === "home") router.push("/home");
+            if (k === "browse") router.push("/browse");
+            if (k === "post") router.push("/home");
+            if (k === "inbox") router.push("/inbox");
+            if (k === "me") router.push("/profile");
+          }}
+        />
+      )}
+    </View>
   );
 }

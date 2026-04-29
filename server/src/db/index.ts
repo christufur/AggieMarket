@@ -157,6 +157,18 @@ try {
   // column already exists
 }
 
+// Optional organization attached to an event
+try {
+  db.run(`ALTER TABLE events ADD COLUMN organization TEXT`);
+} catch {
+  // column already exists
+}
+try {
+  db.run(`ALTER TABLE events ADD COLUMN organization_url TEXT`);
+} catch {
+  // column already exists
+}
+
 db.run(`
   CREATE TABLE IF NOT EXISTS event_attendees (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

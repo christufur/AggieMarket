@@ -197,13 +197,21 @@ const listingsRoutes = new Elysia()
         if ('status' in payload) return payload;
 
         const listing = db.query("SELECT * FROM listings WHERE id = ? AND status != 'deleted'").get(params.id) as {
-            id: string; seller_id: number;
+            id: string; seller_id: number; status: string;
         } | null;
 
         if (!listing) return { message: "Listing not found", status: 404 };
         if (String(listing.seller_id) !== String(payload.id)) return { message: "Forbidden", status: 403 };
 
         const { title, description, price, is_free, category, condition, status } = body as PatchListingBody;
+
+        // Sold listings are locked: only allow status changes via this endpoint,
+        // not edits to title/price/etc. Mark-sold should use POST /listings/:id/mark-sold.
+        const isContentEdit = title !== undefined || description !== undefined ||
+            price !== undefined || is_free !== undefined || category !== undefined || condition !== undefined;
+        if (listing.status === "sold" && isContentEdit) {
+            return { message: "Cannot edit a sold listing", status: 409 };
+        }
 
         db.run(
             `UPDATE listings SET

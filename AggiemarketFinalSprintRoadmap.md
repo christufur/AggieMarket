@@ -24,8 +24,8 @@ A fresh user installs AggieMarket from TestFlight, registers with `@nmsu.edu`, b
 | TASK-1 Home screen real data       | ✅ Backend endpoints done        | ✅ Frontend done | —               |
 | TASK-2 FTS5 search                 | —                                | ✅ Frontend done | ✅ Backend done  |
 | TASK-3 Client WebSocket            | —                                | ✅ Done         | —                |
-| TASK-4 TestFlight build            | 🔄 In progress (enrollment)      | —               | —                |
-| TASK-5 APNs push                   | ✅ Backend done / frontend next  | —               | —                |
+| TASK-4 TestFlight build            | 🔄 Config done — run eas build   | —               | —                |
+| TASK-5 APNs push                   | ✅ Backend + frontend done       | —               | —                |
 | TASK-6 Seed data                   | ✅ Script ready (run on prod)    | —               | —                |
 | TASK-7 Reviews and Ratings         | —                                | ✅ Frontend done | ✅ Backend done  |
 | TASK-8 Mark as Sold + profile tabs | —                                | ✅ Frontend done | ✅ Backend done  |
@@ -351,3 +351,105 @@ ssh ec2  →  cd /path/to/server  →  bun scripts/seed.ts
 - Unifying listings / services / events into one table
 - Auto-expiring listings (30-day rule)
 - Services and Events search (search is listings-only for now)
+
+---
+
+## Pickup Feature Plan
+
+The "Confirm pickup" button has been removed from the inbox right rail for now. The
+proper feature replaces a single button with a small state machine shared by buyer and
+seller.
+
+### Goals
+
+1. Buyer and seller can agree on a pickup time and place inside the chat without
+   leaving Aggie Market.
+2. A listing can only be marked **sold** after both sides confirm pickup happened —
+   not just a one-sided tap.
+3. Reviews/ratings unlock only after a confirmed pickup so we don't get review spam
+   on listings that never actually changed hands.
+
+### Pickup states (per conversation, listing-only for v1)
+
+```
+none → proposed → scheduled → completed
+                       ↓
+                    cancelled
+```
+
+- `none` — default. Just a chat thread.
+- `proposed` — one party submitted a `{location, time, notes}` offer. The other side
+  sees an Accept / Decline / Counter card.
+- `scheduled` — both sides accepted. A live "Pickup at {place} on {date}" card
+  pins to the top of the chat.
+- `completed` — after the scheduled time passes, both sides get a "Did the pickup
+  happen?" prompt. Two YES taps move the listing to `sold` and unlock ratings.
+- `cancelled` — either side bails. Returns to `none` so they can repropose.
+
+### Backend (server/src/routes/pickups.ts — new file)
+
+Migration: a `pickups` table.
+
+```sql
+CREATE TABLE pickups (
+  id           TEXT PRIMARY KEY,
+  listing_id   TEXT NOT NULL REFERENCES listings(id) ON DELETE CASCADE,
+  conversation_id TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+  proposer_id  INTEGER NOT NULL,
+  status       TEXT NOT NULL CHECK (status IN ('proposed','scheduled','completed','cancelled')),
+  location     TEXT NOT NULL,
+  scheduled_at TEXT NOT NULL,
+  notes        TEXT,
+  buyer_confirmed_at  TEXT,
+  seller_confirmed_at TEXT,
+  created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at   TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE UNIQUE INDEX pickup_active_per_listing
+  ON pickups(listing_id) WHERE status IN ('proposed','scheduled');
+```
+
+Endpoints (all auth-gated, both buyer and seller of the listing allowed):
+
+- `POST   /pickups`                    — body `{listing_id, conversation_id, location, scheduled_at, notes?}` → creates `proposed`
+- `GET    /pickups/by-conversation/:conversation_id` — returns the active pickup or null
+- `PATCH  /pickups/:id/accept`          — counterpart accepts → `scheduled`
+- `PATCH  /pickups/:id/counter`         — body `{location?, scheduled_at?, notes?}` → resets to `proposed` from the other side
+- `PATCH  /pickups/:id/cancel`          — either party cancels → `cancelled`
+- `PATCH  /pickups/:id/confirm`         — must be `scheduled` AND `now() >= scheduled_at`. Sets `buyer_confirmed_at` or `seller_confirmed_at` based on caller. When both timestamps are set: status → `completed` and the linked listing is auto-marked `sold` (reuses `markSold` SQL transaction).
+
+WebSocket: when status changes, push `{type: "pickup_update", conversationId, pickup}` so both clients re-render the chat banner without polling.
+
+### Frontend
+
+1. **`components/PickupCard.tsx`** — single component rendered:
+   - Inline in the chat stream when status = `proposed` (Accept / Counter / Decline buttons).
+   - Pinned banner above the message list when status = `scheduled`.
+   - Inline "How did it go?" card when status = `scheduled` AND `now >= scheduled_at`,
+     with two states (waiting for you / waiting for them) until both sides confirm.
+2. **Inbox right rail (`app/inbox.tsx`)** — replace today's static "Pickup plan" card
+   with a button "Propose pickup" when status = `none`. On press, opens a small modal
+   with location autocomplete (campus map points first), date/time picker, optional notes.
+3. **Listing page (`app/listing/[id].tsx`)** — when an active pickup exists, show a
+   "Pickup scheduled for {date}" banner instead of the "Make offer / Message seller"
+   action bar (web) or the sticky bottom bar (native).
+4. **Profile / ratings** — `POST /ratings` already requires a `transaction_id`. After
+   the pickup transitions to `completed`, generate that transaction id and surface a
+   "Leave a review" CTA in the chat for the next 14 days.
+
+### Rollout
+
+1. Ship migration + endpoints behind a feature flag (`PICKUPS_ENABLED`).
+2. Ship `PickupCard` and the inbox propose button only for listings (not services /
+   events) — keeps blast radius small.
+3. Once a few real pickups complete cleanly in production, gate the new
+   "Mark sold" path behind pickup completion and remove the legacy "Mark sold" button
+   that fires without a confirmed pickup.
+
+### Out of scope for v1
+
+- Pickup for services and events (different shape — recurring services don't fit).
+- Real maps / route directions.
+- Reminders 1h before scheduled time (push notification — easy follow-up using the
+  existing push token table).
+- Disputes / "didn't happen" arbitration — for v1 either party cancelling is enough.

@@ -4,16 +4,31 @@
     "slug": "AggieMarket",
     "version": "1.0.0",
     "scheme": "aggiemarket",
+    "userInterfaceStyle": "automatic",
     "web": {
       "output": "static",
       "favicon": "./assets/images/favicon.png"
     },
+    "ios": {
+      "bundleIdentifier": "com.csci.SeniorProjMarketplaceSP26",
+      "supportsTablet": false,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      "expo-notifications"
     ],
     "experiments": {
-      "typedRoutes": true,
-      "reactCompiler": true
-    }
+      "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "00caa1ca-d912-4b45-b1a8-4805fdac5c1f"
+      }
+    },
+    "owner": "christufur"
   }
 }
