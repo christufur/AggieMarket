@@ -30,9 +30,6 @@ import { confirmAsync } from "@/lib/dialogs";
 // ── Main ─────────────────────────────────────────────────────────────────────
 
 export default function ProfileScreen() {
-
-  const [modalVisible, setModalVisible] = useState(false);
-
   const { user, token, logout } = useAuth();
   const router = useRouter();
   const { unreadCount } = useWebSocket();

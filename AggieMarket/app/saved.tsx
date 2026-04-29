@@ -11,9 +11,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { SiteHeader } from "@/components/ui/SiteHeader";
 import { BottomNav } from "@/components/ui/BottomNav";
 import { fmtDate } from "@/lib/utils";
-import { Navbar } from "@/components/ui/navbar";
-import { CreatePostModal } from "@/components/ui/createpostmodal";
-
 
 type SavedListing = {
   saved_id: number;
@@ -47,9 +44,6 @@ type SavedEvent = {
 };
 
 export default function SavedScreen() {
-
-  const [modalVisible, setModalVisible] = useState(false);
-
   const { token } = useAuth();
   const router = useRouter();
   const { unreadCount } = useWebSocket();
@@ -72,11 +66,6 @@ export default function SavedScreen() {
   }, [token]);
 
   useEffect(() => { fetchSaved(); }, [fetchSaved]);
-
-  const closeModal = useCallback(() => setModalVisible(false), []);
-
-  const handleSaved = useCallback(() => {
-  }, []);
 
   const unsave = async (savedId: number, type: "listings" | "services" | "events") => {
     await fetch(API.savedItem(savedId), { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });

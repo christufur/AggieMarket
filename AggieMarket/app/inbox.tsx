@@ -19,9 +19,6 @@ import { BottomNav } from "@/components/ui/BottomNav";
 import * as ImagePicker from "expo-image-picker";
 
 import type { Conversation, Message } from "@/types";
-import { Navbar } from "@/components/ui/navbar";
-import { CreatePostModal } from "@/components/ui/createpostmodal";
-
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
