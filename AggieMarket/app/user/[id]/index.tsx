@@ -16,7 +16,7 @@ import { SiteHeader, NavAvatar } from "@/components/ui/SiteHeader";
 import { BottomNav } from "@/components/ui/BottomNav";
 import { useWebSocket } from "@/context/WebSocketContext";
 import type { ProfileData, ListingItem, ServiceItem, EventItem, RatingItem } from "@/types";
-import { fmtDate, fmtJoined } from "@/lib/utils";
+import { fmtDate, fmtJoined, isPastDay } from "@/lib/utils";
 
 export default function PublicProfileScreen() {
   const _ws = useWebSocket();
@@ -466,7 +466,7 @@ export default function PublicProfileScreen() {
                       <View style={{ gap: 14 }}>
                         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 14 }}>
                           {events.slice(0, 2).map((item) => {
-                            const isPast = new Date(item.starts_at).getTime() < Date.now();
+                            const isPast = isPastDay(item.starts_at);
                             return (
                               <Card key={item.id} style={{ overflow: "hidden", opacity: isPast ? 0.78 : 1 }}>
                                 <Pressable onPress={() => router.push(`/event/${item.id}`)} style={{ cursor: "pointer" as any }}>

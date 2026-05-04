@@ -11,7 +11,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { SiteHeader } from "@/components/ui/SiteHeader";
 import type { ProfileData, ListingItem, ServiceItem, EventItem } from "@/types";
-import { fmtDate } from "@/lib/utils";
+import { fmtDate, isPastDay } from "@/lib/utils";
 
 type ItemType = "listings" | "services" | "events";
 
@@ -192,7 +192,7 @@ export default function UserItemsScreen() {
               ))}
 
               {itemType === "events" && events.map((item) => {
-                const isPast = new Date(item.starts_at).getTime() < Date.now();
+                const isPast = isPastDay(item.starts_at);
                 return (
                   <Card key={item.id} className="overflow-hidden" style={{ opacity: isPast ? 0.78 : 1 }}>
                     <Pressable onPress={() => router.push(`/event/${item.id}`)} style={{ cursor: "pointer" as any }}>

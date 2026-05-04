@@ -23,7 +23,7 @@ import { SiteHeader } from "@/components/ui/SiteHeader";
 import {
   CONDITIONS, LISTING_CATEGORIES, SERVICE_CATEGORIES, EVENT_CATEGORIES,
 } from "@/constants/categories";
-import { priceLabel, fmtDate as formatDate } from "@/lib/utils";
+import { priceLabel, fmtDate as formatDate, isPastDay } from "@/lib/utils";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -226,7 +226,7 @@ const EventCard = memo(function EventCard({ item }: { item: Event }) {
   const [hovered, setHovered] = useState(false);
   const ticketLabel = item.is_free ? "Free" : item.ticket_price != null ? `$${item.ticket_price}` : "Paid";
   const cats = item.category.split(",").map((c) => c.trim()).filter(Boolean);
-  const isPast = !!item.is_past || new Date(item.starts_at).getTime() < Date.now();
+  const isPast = !!item.is_past || isPastDay(item.starts_at);
 
   return (
     <Pressable

@@ -75,7 +75,7 @@ const usersRoutes = new Elysia()
     const events = db.query(`
       SELECT e.*,
              (SELECT s3_url FROM event_images WHERE event_id = e.id ORDER BY sort_order ASC LIMIT 1) AS image_url,
-             CASE WHEN e.starts_at < datetime('now') THEN 1 ELSE 0 END AS is_past
+             CASE WHEN date(e.starts_at) < date('now', 'localtime') THEN 1 ELSE 0 END AS is_past
       FROM events e
       WHERE organizer_id = ? AND status = 'active'
       ORDER BY is_past ASC, starts_at DESC

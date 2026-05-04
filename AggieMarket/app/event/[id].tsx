@@ -18,6 +18,7 @@ import { SiteHeader, NavAvatar } from "@/components/ui/SiteHeader";
 import { BottomNav } from "@/components/ui/BottomNav";
 import { useWebSocket } from "@/context/WebSocketContext";
 import { confirmAsync } from "@/lib/dialogs";
+import { isPastDay } from "@/lib/utils";
 
 type EventDetail = {
   id: string;
@@ -365,7 +366,7 @@ export default function EventDetailScreenWeb() {
                   </Badge>
                 </View>
 
-                {new Date(event.starts_at).getTime() < Date.now() && (
+                {isPastDay(event.starts_at) && (
                   <View style={{
                     flexDirection: "row",
                     alignItems: "center",
@@ -537,7 +538,7 @@ export default function EventDetailScreenWeb() {
                       <Button
                         className="flex-1"
                         style={
-                          new Date(event.starts_at).getTime() < Date.now()
+                          isPastDay(event.starts_at)
                             ? { backgroundColor: colors.mid }
                             : rsvpStatus
                               ? { backgroundColor: colors.success }
@@ -546,11 +547,11 @@ export default function EventDetailScreenWeb() {
                                 : undefined
                         }
                         onPress={toggleRsvp}
-                        disabled={rsvpLoading || new Date(event.starts_at).getTime() < Date.now()}
+                        disabled={rsvpLoading || isPastDay(event.starts_at)}
                       >
                         <Ionicons
                           name={
-                            new Date(event.starts_at).getTime() < Date.now()
+                            isPastDay(event.starts_at)
                               ? "time-outline"
                               : rsvpStatus
                                 ? "checkmark-circle"
@@ -560,7 +561,7 @@ export default function EventDetailScreenWeb() {
                           color={colors.white}
                         />
                         <Text className="ml-2 text-sm font-semibold text-primary-foreground">
-                          {new Date(event.starts_at).getTime() < Date.now()
+                          {isPastDay(event.starts_at)
                             ? "Past the date"
                             : rsvpStatus
                               ? "RSVP'd — Going"

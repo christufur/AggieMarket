@@ -16,7 +16,7 @@ const eventsRoutes = new Elysia()
 
         const whereClause = includePast
             ? `WHERE e.status = 'active'`
-            : `WHERE e.status = 'active' AND e.starts_at >= datetime('now')`;
+            : `WHERE e.status = 'active' AND date(e.starts_at) >= date('now', 'localtime')`;
 
         const total = (db.query(
             `SELECT COUNT(*) as count FROM events e ${whereClause}`
@@ -26,7 +26,7 @@ const eventsRoutes = new Elysia()
         const events = db.query(
             `SELECT e.*, u.name AS organizer_name,
                     (SELECT s3_url FROM event_images WHERE event_id = e.id ORDER BY sort_order ASC LIMIT 1) AS image_url,
-                    CASE WHEN e.starts_at < datetime('now') THEN 1 ELSE 0 END AS is_past
+                    CASE WHEN date(e.starts_at) < date('now', 'localtime') THEN 1 ELSE 0 END AS is_past
              FROM events e
              LEFT JOIN users u ON u.id = e.organizer_id
              ${whereClause}
@@ -45,7 +45,7 @@ const eventsRoutes = new Elysia()
                     0 AS is_past
              FROM events e
              LEFT JOIN users u ON u.id = e.organizer_id
-             WHERE e.status = 'active' AND e.starts_at >= datetime('now')
+             WHERE e.status = 'active' AND date(e.starts_at) >= date('now', 'localtime')
              ORDER BY e.starts_at ASC LIMIT ?`
         ).all(limit);
 
@@ -55,7 +55,7 @@ const eventsRoutes = new Elysia()
     .get("/events/category/:category", ({ params }) => {
         const events = db.query(
             `SELECT *,
-                    CASE WHEN starts_at < datetime('now') THEN 1 ELSE 0 END AS is_past
+                    CASE WHEN date(starts_at) < date('now', 'localtime') THEN 1 ELSE 0 END AS is_past
              FROM events WHERE category = ? AND status = 'active'
              ORDER BY is_past ASC, starts_at ASC`
         ).all(params.category);
@@ -65,7 +65,7 @@ const eventsRoutes = new Elysia()
     .get("/events/organizer/:organizer_id", ({ params }) => {
         const events = db.query(
             `SELECT *,
-                    CASE WHEN starts_at < datetime('now') THEN 1 ELSE 0 END AS is_past
+                    CASE WHEN date(starts_at) < date('now', 'localtime') THEN 1 ELSE 0 END AS is_past
              FROM events WHERE organizer_id = ? AND status = 'active'
              ORDER BY is_past ASC, starts_at DESC`
         ).all(params.organizer_id);

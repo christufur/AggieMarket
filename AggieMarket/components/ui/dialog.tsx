@@ -1,5 +1,6 @@
 import * as React from "react";
 import { Modal, Pressable, View, useWindowDimensions, Platform } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { cn } from "@/lib/utils";
 import { TextClassContext } from "./text";
 
@@ -55,6 +56,7 @@ function DialogContent({
 }) {
   const { open, onOpenChange } = React.useContext(DialogContext);
   const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const isMobile = Platform.OS !== "web" || width < 640;
   return (
     <Modal visible={open} transparent={!isMobile} animationType={isMobile ? "slide" : "fade"} presentationStyle={isMobile ? "fullScreen" : undefined}>
@@ -70,7 +72,11 @@ function DialogContent({
             className
           )}
           onPress={(e) => e.stopPropagation()}
-          style={isMobile ? { flex: 1, width: "100%" as any } : undefined}
+          style={
+            isMobile
+              ? { flex: 1, width: "100%" as any, paddingTop: insets.top, paddingBottom: insets.bottom }
+              : undefined
+          }
         >
           {children}
         </Pressable>
