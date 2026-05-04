@@ -35,7 +35,7 @@ export const API = {
   eventRsvp: (id: string) => `${BASE}/events/${id}/rsvp`,
   eventAttendees: (id: string) => `${BASE}/events/${id}/attendees`,
   upload: `${BASE}/upload`,
-  mediaUrl: (path: string) => `${BASE}${path}`,
+  mediaUrl: (path: string) => path.startsWith("http") ? path : `${BASE}${path}`,
   user: (id: number) => `${BASE}/users/${id}`,
   userListings: (id: number) => `${BASE}/users/${id}/listings`,
   userServices: (id: number) => `${BASE}/users/${id}/services`,
