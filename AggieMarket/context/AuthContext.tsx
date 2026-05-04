@@ -1,11 +1,15 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { Platform } from "react-native";
+import * as Notifications from "expo-notifications";
 import { API } from "../constants/api";
+import { storage } from "../lib/storage";
 
 type User = {
   id: number;
   name: string;
   email: string;
   status: string;
+  is_admin?: number;
 };
 
 type AuthContextType = {
@@ -20,11 +24,19 @@ const AuthContext = createContext<AuthContextType | null>(null);
 
 const TOKEN_KEY = "aggie_token";
 
-const storage = {
-  get: (key: string) => localStorage.getItem(key),
-  set: (key: string, value: string) => localStorage.setItem(key, value),
-  delete: (key: string) => localStorage.removeItem(key),
-};
+async function registerPushToken(authToken: string) {
+  const { status } = await Notifications.requestPermissionsAsync();
+  if (status !== "granted") return;
+  const { data: expoPushToken } = await Notifications.getExpoPushTokenAsync();
+  await fetch(API.pushToken, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${authToken}`,
+    },
+    body: JSON.stringify({ token: expoPushToken, platform: Platform.OS }),
+  });
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -34,7 +46,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     (async () => {
       try {
-        const stored = storage.get(TOKEN_KEY);
+        const stored = await storage.get(TOKEN_KEY);
         if (stored) {
           const res = await fetch(API.me, {
             headers: { Authorization: `Bearer ${stored}` },
@@ -44,7 +56,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setToken(stored);
             setUser(data.user);
           } else {
-            storage.delete(TOKEN_KEY);
+            await storage.delete(TOKEN_KEY);
           }
         }
       } catch {
@@ -56,13 +68,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = async (newToken: string, newUser: User) => {
-    storage.set(TOKEN_KEY, newToken);
+    await storage.set(TOKEN_KEY, newToken);
     setToken(newToken);
     setUser(newUser);
+    if (Platform.OS !== "web") {
+      registerPushToken(newToken).catch(() => {});
+    }
   };
 
   const logout = async () => {
-    storage.delete(TOKEN_KEY);
+    await storage.delete(TOKEN_KEY);
     setToken(null);
     setUser(null);
   };

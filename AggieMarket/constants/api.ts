@@ -16,6 +16,7 @@ export const API = {
   me: `${BASE}/auth/me`,
   listings: `${BASE}/listings`,
   listingsPopular: (limit = 10) => `${BASE}/listings/popular?limit=${limit}`,
+  search: `${BASE}/search`,
   listing: (id: string) => `${BASE}/listings/${id}`,
   listingImages: (id: string) => `${BASE}/listings/${id}/images`,
   services: `${BASE}/services`,
@@ -46,4 +47,11 @@ export const API = {
   savedItem: (id: number) => `${BASE}/saved/${id}`,
   wsChat: (token: string) =>
     `${WS_BASE}/ws/chat?token=${encodeURIComponent(token)}`,
+  markSold: (id: string) => `${BASE}/listings/${id}/mark-sold`,
+  ratings: `${BASE}/ratings`,
+  userRatings: (id: number) => `${BASE}/users/${id}/ratings`,
+  reports: `${BASE}/reports`,
+  adminReports: `${BASE}/admin/reports`,
+  adminReportResolve: (id: number) => `${BASE}/admin/reports/${id}/resolve`,
+  adminReportDismiss: (id: number) => `${BASE}/admin/reports/${id}/dismiss`,
 };

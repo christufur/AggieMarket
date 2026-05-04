@@ -1,5 +1,6 @@
 import * as React from "react";
-import { Modal, Pressable, View } from "react-native";
+import { Modal, Pressable, View, useWindowDimensions, Platform } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { cn } from "@/lib/utils";
 import { TextClassContext } from "./text";
 
@@ -54,18 +55,28 @@ function DialogContent({
   className?: string;
 }) {
   const { open, onOpenChange } = React.useContext(DialogContext);
+  const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const isMobile = Platform.OS !== "web" || width < 640;
   return (
-    <Modal visible={open} transparent animationType="fade">
+    <Modal visible={open} transparent={!isMobile} animationType={isMobile ? "slide" : "fade"} presentationStyle={isMobile ? "fullScreen" : undefined}>
       <Pressable
-        className="flex-1 bg-black/50 justify-center items-center"
-        onPress={() => onOpenChange(false)}
+        className={isMobile ? "flex-1 bg-card" : "flex-1 bg-black/50 justify-center items-center"}
+        onPress={isMobile ? undefined : () => onOpenChange(false)}
       >
         <Pressable
           className={cn(
-            "bg-card rounded-xl p-6 mx-4 w-full max-w-md shadow-lg",
+            isMobile
+              ? "bg-card flex-1 w-full"
+              : "bg-card rounded-xl p-6 mx-4 w-full max-w-md shadow-lg",
             className
           )}
           onPress={(e) => e.stopPropagation()}
+          style={
+            isMobile
+              ? { flex: 1, width: "100%" as any, paddingTop: insets.top, paddingBottom: insets.bottom }
+              : undefined
+          }
         >
           {children}
         </Pressable>

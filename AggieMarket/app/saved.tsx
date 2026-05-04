@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { View, ScrollView, ActivityIndicator, Pressable, Image } from "react-native";
+import { View, ScrollView, ActivityIndicator, Pressable, Image, Platform } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/context/AuthContext";
@@ -8,6 +8,8 @@ import { API } from "@/constants/api";
 import { colors } from "@/theme/colors";
 import { Text } from "@/components/ui/text";
 import { Card, CardContent } from "@/components/ui/card";
+import { SiteHeader } from "@/components/ui/SiteHeader";
+import { BottomNav } from "@/components/ui/BottomNav";
 import { fmtDate } from "@/lib/utils";
 
 type SavedListing = {
@@ -84,45 +86,9 @@ export default function SavedScreen() {
 
   return (
     <View className="flex-1 bg-background" style={{ minHeight: "100vh" as any }}>
+      <SiteHeader crumb="Saved" showSearch={false} />
       <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
-        {/* Nav */}
-        <View className="bg-card border-b border-border px-6 py-3">
-          <View className="flex-row items-center justify-between" style={{ maxWidth: 1100, marginHorizontal: "auto", width: "100%" }}>
-            <View className="flex-row items-center gap-3">
-              <Pressable onPress={() => router.push("/home")} className="flex-row items-center gap-1.5">
-                <View className="bg-primary rounded px-1.5 py-0.5">
-                  <Text className="text-xs font-bold text-primary-foreground">AM</Text>
-                </View>
-                <Text className="text-sm font-semibold text-foreground">Home</Text>
-              </Pressable>
-              <Ionicons name="chevron-forward" size={12} color={colors.mid} />
-              <Text className="text-sm text-muted-foreground">Saved Items</Text>
-            </View>
-            <View className="flex-row items-center gap-2">
-              <Pressable className="w-9 h-9 border-[1.5px] border-border rounded-lg items-center justify-center" onPress={() => router.push("/inbox")} style={{ position: "relative" as any }}>
-                <Ionicons name="chatbubble-outline" size={16} color={colors.dark} />
-                {unreadCount > 0 && (
-                  <View style={{
-                    position: "absolute", top: -4, right: -4,
-                    backgroundColor: colors.primary, borderRadius: 100,
-                    minWidth: 16, height: 16, paddingHorizontal: 3,
-                    alignItems: "center", justifyContent: "center",
-                    borderWidth: 1.5, borderColor: colors.white,
-                  }}>
-                    <Text style={{ color: colors.white, fontSize: 9, fontWeight: "700" }}>
-                      {unreadCount > 99 ? "99+" : unreadCount}
-                    </Text>
-                  </View>
-                )}
-              </Pressable>
-              <Pressable className="w-9 h-9 border-[1.5px] border-border rounded-lg items-center justify-center" onPress={() => router.push("/profile")}>
-                <Ionicons name="person-outline" size={16} color={colors.dark} />
-              </Pressable>
-            </View>
-          </View>
-        </View>
-
-        <View style={{ maxWidth: 900, marginHorizontal: "auto", width: "100%" }} className="px-4 py-6">
+        <View style={{ maxWidth: 1100, marginHorizontal: "auto", width: "100%" }} className="px-4 py-6">
           {/* Header */}
           <View className="flex-row items-center gap-3 mb-6">
             <Ionicons name="heart" size={24} color={colors.primary} />
@@ -139,11 +105,13 @@ export default function SavedScreen() {
             ]).map(({ key, label, count }) => (
               <Pressable
                 key={key}
-                className="px-4 py-2 rounded-full"
-                style={tab === key ? { backgroundColor: colors.primaryLight } : undefined}
                 onPress={() => setTab(key)}
+                style={[
+                  { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 100, cursor: "pointer" as any },
+                  tab === key ? { backgroundColor: colors.primary } : { backgroundColor: "transparent" },
+                ]}
               >
-                <Text className="text-sm font-semibold" style={{ color: tab === key ? colors.primary : colors.dark }}>
+                <Text style={{ fontSize: 13, fontWeight: "600", color: tab === key ? colors.white : colors.dark }}>
                   {label} ({count})
                 </Text>
               </Pressable>
@@ -158,9 +126,9 @@ export default function SavedScreen() {
                 <Text className="text-sm text-muted-foreground mt-3">No saved listings</Text>
               </View>
             ) : (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12 }}>
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 14 }}>
                 {listings.map((item) => (
-                  <Card key={item.id} className="overflow-hidden transition-shadow hover:shadow-lg">
+                  <Card key={item.id} className="overflow-hidden transition-shadow hover:shadow-lg" style={{ flexBasis: 220, flexGrow: 1, maxWidth: 320 } as any}>
                     <Pressable onPress={() => router.push(`/listing/${item.id}`)}>
                       {item.image_url ? (
                         <Image source={{ uri: API.mediaUrl(item.image_url) }} style={{ width: "100%" as any, height: 120 }} resizeMode="cover" />
@@ -185,7 +153,7 @@ export default function SavedScreen() {
                     </View>
                   </Card>
                 ))}
-              </div>
+              </View>
             )
           )}
 
@@ -197,9 +165,9 @@ export default function SavedScreen() {
                 <Text className="text-sm text-muted-foreground mt-3">No saved services</Text>
               </View>
             ) : (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12 }}>
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 14 }}>
                 {services.map((item) => (
-                  <Card key={item.id} className="overflow-hidden transition-shadow hover:shadow-lg">
+                  <Card key={item.id} className="overflow-hidden transition-shadow hover:shadow-lg" style={{ flexBasis: 220, flexGrow: 1, maxWidth: 320 } as any}>
                     <Pressable onPress={() => router.push(`/service/${item.id}`)}>
                       {item.image_url ? (
                         <Image source={{ uri: API.mediaUrl(item.image_url) }} style={{ width: "100%" as any, height: 120 }} resizeMode="cover" />
@@ -224,7 +192,7 @@ export default function SavedScreen() {
                     </View>
                   </Card>
                 ))}
-              </div>
+              </View>
             )
           )}
 
@@ -236,9 +204,9 @@ export default function SavedScreen() {
                 <Text className="text-sm text-muted-foreground mt-3">No saved events</Text>
               </View>
             ) : (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12 }}>
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 14 }}>
                 {events.map((item) => (
-                  <Card key={item.id} className="overflow-hidden transition-shadow hover:shadow-lg">
+                  <Card key={item.id} className="overflow-hidden transition-shadow hover:shadow-lg" style={{ flexBasis: 220, flexGrow: 1, maxWidth: 320 } as any}>
                     <Pressable onPress={() => router.push(`/event/${item.id}`)}>
                       {item.image_url ? (
                         <Image source={{ uri: API.mediaUrl(item.image_url) }} style={{ width: "100%" as any, height: 120 }} resizeMode="cover" />
@@ -264,11 +232,24 @@ export default function SavedScreen() {
                     </View>
                   </Card>
                 ))}
-              </div>
+              </View>
             )
           )}
         </View>
       </ScrollView>
+      {Platform.OS !== "web" && (
+        <BottomNav
+          active="home"
+          unreadCount={unreadCount}
+          onPress={(k) => {
+            if (k === "home") router.push("/home");
+            if (k === "browse") router.push("/browse");
+            if (k === "post") router.push("/home");
+            if (k === "inbox") router.push("/inbox");
+            if (k === "me") router.push("/profile");
+          }}
+        />
+      )}
     </View>
   );
 }

@@ -1,11 +1,12 @@
 import { Elysia } from "elysia"
 import { jwt } from "@elysiajs/jwt"
+import crypto from "crypto";
 import db from "../db";
 import { sendVerificationEmail } from "../utils/email";
 
 const isValidEmail = (email: string) => email.endsWith("@nmsu.edu");
 
-const generateToken = () => Math.floor(100000 + Math.random() * 900000).toString();
+const generateToken = () => crypto.randomInt(100000, 1000000).toString();
 
 const authRoutes = new Elysia()
     .use(jwt({ name: "jwt", secret: process.env.JWT_SECRET! }))
@@ -108,7 +109,7 @@ const authRoutes = new Elysia()
         }
 
         const user = db.query(
-            "SELECT id, name, email, status FROM users WHERE id = ?"
+            "SELECT id, name, email, status, is_admin FROM users WHERE id = ?"
         ).get(payload.id);
 
         if (!user) {

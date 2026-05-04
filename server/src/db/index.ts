@@ -28,6 +28,12 @@ try {
   // column already exists
 }
 
+try {
+  db.run(`ALTER TABLE users ADD COLUMN is_admin INTEGER DEFAULT 0`);
+} catch {
+  // column already exists
+}
+
 db.run(`
   CREATE TABLE IF NOT EXISTS email_verifications (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -151,6 +157,18 @@ try {
   // column already exists
 }
 
+// Optional organization attached to an event
+try {
+  db.run(`ALTER TABLE events ADD COLUMN organization TEXT`);
+} catch {
+  // column already exists
+}
+try {
+  db.run(`ALTER TABLE events ADD COLUMN organization_url TEXT`);
+} catch {
+  // column already exists
+}
+
 db.run(`
   CREATE TABLE IF NOT EXISTS event_attendees (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -189,6 +207,27 @@ CREATE VIRTUAL TABLE IF NOT EXISTS events_fts USING fts5(
 );
 `);
 
+db.run(`
+  CREATE TRIGGER IF NOT EXISTS listings_ai AFTER INSERT ON listings BEGIN
+    INSERT INTO listings_fts(rowid, id, title, description, category)
+    VALUES (new.rowid, new.id, new.title, new.description, new.category);
+  END;
+
+  CREATE TRIGGER IF NOT EXISTS listings_ad AFTER DELETE ON listings BEGIN
+    INSERT INTO listings_fts(listings_fts, rowid, id, title, description, category)
+    VALUES ('delete', old.rowid, old.id, old.title, old.description, old.category);
+  END;
+
+  CREATE TRIGGER IF NOT EXISTS listings_au AFTER UPDATE ON listings BEGIN
+    INSERT INTO listings_fts(listings_fts, rowid, id, title, description, category)
+    VALUES ('delete', old.rowid, old.id, old.title, old.description, old.category);
+    INSERT INTO listings_fts(rowid, id, title, description, category)
+    VALUES (new.rowid, new.id, new.title, new.description, new.category);
+  END;
+`);
+
+db.run(`INSERT INTO listings_fts(listings_fts) VALUES ('rebuild');`);
+
 // Conversation and Messaging Tables
 db.run(`
   -- Conversations table: Represents a chat thread between a buyer and seller
@@ -212,12 +251,19 @@ db.run(`
     conversation_id TEXT NOT NULL,
     sender_id INTEGER NOT NULL,
     content TEXT NOT NULL,
+    is_hidden INTEGER DEFAULT 0,
     read_at DATETIME,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (conversation_id) REFERENCES conversations (id) ON DELETE CASCADE,
     FOREIGN KEY (sender_id) REFERENCES users (id) ON DELETE CASCADE
   );
 `);
+
+try {
+  db.run(`ALTER TABLE messages ADD COLUMN is_hidden INTEGER DEFAULT 0`);
+} catch {
+  // column already exists
+}
 
 // Indexes for performance
 db.run(`
@@ -276,19 +322,116 @@ db.run(`
   );
 `);
 
-// is_admin column on users (TASK-9 admin moderation)
-try {
-  db.run(`ALTER TABLE users ADD COLUMN is_admin INTEGER DEFAULT 0`);
-} catch {
-  // column already exists
-}
-
 // Seed version tracking (TASK-6 idempotent seed)
 db.run(`
   CREATE TABLE IF NOT EXISTS seed_meta (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
   );
+`);
+
+db.run(`
+  CREATE TABLE IF NOT EXISTS transactions (
+    id TEXT PRIMARY KEY,
+    listing_id TEXT NOT NULL UNIQUE,
+    seller_id INTEGER NOT NULL,
+    buyer_id INTEGER,
+    sold_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (listing_id) REFERENCES listings(id) ON DELETE CASCADE,
+    FOREIGN KEY (seller_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (buyer_id) REFERENCES users(id) ON DELETE SET NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_transactions_seller_sold_at
+    ON transactions (seller_id, sold_at DESC);
+  CREATE INDEX IF NOT EXISTS idx_transactions_buyer_sold_at
+    ON transactions (buyer_id, sold_at DESC);
+`);
+
+db.run(`
+  CREATE TABLE IF NOT EXISTS ratings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    transaction_id TEXT NOT NULL,
+    reviewer_id INTEGER NOT NULL,
+    reviewee_id INTEGER NOT NULL,
+    stars INTEGER NOT NULL CHECK (stars BETWEEN 1 AND 5),
+    body TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (transaction_id, reviewer_id),
+    FOREIGN KEY (transaction_id) REFERENCES transactions(id) ON DELETE CASCADE,
+    FOREIGN KEY (reviewer_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (reviewee_id) REFERENCES users(id) ON DELETE CASCADE,
+    CHECK (reviewer_id != reviewee_id)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_ratings_reviewee_created
+    ON ratings (reviewee_id, created_at DESC);
+`);
+
+db.run(`
+  CREATE TRIGGER IF NOT EXISTS ratings_ai AFTER INSERT ON ratings BEGIN
+    UPDATE users
+    SET rating_count = (
+          SELECT COUNT(*) FROM ratings WHERE reviewee_id = NEW.reviewee_id
+        ),
+        rating_avg = COALESCE((
+          SELECT AVG(stars) FROM ratings WHERE reviewee_id = NEW.reviewee_id
+        ), 0.0)
+    WHERE id = NEW.reviewee_id;
+  END;
+
+  CREATE TRIGGER IF NOT EXISTS ratings_ad AFTER DELETE ON ratings BEGIN
+    UPDATE users
+    SET rating_count = (
+          SELECT COUNT(*) FROM ratings WHERE reviewee_id = OLD.reviewee_id
+        ),
+        rating_avg = COALESCE((
+          SELECT AVG(stars) FROM ratings WHERE reviewee_id = OLD.reviewee_id
+        ), 0.0)
+    WHERE id = OLD.reviewee_id;
+  END;
+
+  CREATE TRIGGER IF NOT EXISTS ratings_au AFTER UPDATE OF stars, reviewee_id ON ratings BEGIN
+    UPDATE users
+    SET rating_count = (
+          SELECT COUNT(*) FROM ratings WHERE reviewee_id = OLD.reviewee_id
+        ),
+        rating_avg = COALESCE((
+          SELECT AVG(stars) FROM ratings WHERE reviewee_id = OLD.reviewee_id
+        ), 0.0)
+    WHERE id = OLD.reviewee_id;
+
+    UPDATE users
+    SET rating_count = (
+          SELECT COUNT(*) FROM ratings WHERE reviewee_id = NEW.reviewee_id
+        ),
+        rating_avg = COALESCE((
+          SELECT AVG(stars) FROM ratings WHERE reviewee_id = NEW.reviewee_id
+        ), 0.0)
+    WHERE id = NEW.reviewee_id;
+  END;
+`);
+
+db.run(`
+  CREATE TABLE IF NOT EXISTS reports (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    reporter_id INTEGER NOT NULL,
+    target_type TEXT NOT NULL CHECK (target_type IN ('listing', 'message', 'user')),
+    target_id TEXT NOT NULL,
+    reason TEXT NOT NULL,
+    description TEXT,
+    status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'resolved', 'dismissed')),
+    reviewed_by INTEGER,
+    admin_note TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (reporter_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (reviewed_by) REFERENCES users(id) ON DELETE SET NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_reports_status_created
+    ON reports (status, created_at DESC);
+  CREATE INDEX IF NOT EXISTS idx_reports_reporter_created
+    ON reports (reporter_id, created_at DESC);
 `);
 
 export default db;

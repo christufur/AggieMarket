@@ -18,3 +18,12 @@ export function fmtDate(iso: string): string {
 export function fmtJoined(iso: string): string {
   return "Joined " + new Date(iso).toLocaleDateString("en-US", { month: "long", year: "numeric" });
 }
+
+export function isPastDay(iso: string): boolean {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return false;
+  const event = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  return event < today;
+}

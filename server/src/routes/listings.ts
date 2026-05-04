@@ -2,7 +2,7 @@ import { Elysia } from "elysia";
 import { jwt } from "@elysiajs/jwt";
 import db from "../db";
 import crypto from "crypto";
-import { requireAuth, parsePagination } from "../utils/auth";
+import { requireAuth } from "../utils/auth";
 
 type PatchListingBody = {
     title?: string;
@@ -13,6 +13,80 @@ type PatchListingBody = {
     condition?: string | null;
     status?: string;
 };
+
+function buildListingsQuery(options: {
+    category?: string;
+    condition?: string;
+    minPrice?: string;
+    maxPrice?: string;
+    q?: string;
+    limit?: string;
+    offset?: string;
+}) {
+    const conditions: string[] = ["l.status = 'active'"];
+    const params: Array<string | number> = [];
+    const trimmedQuery = options.q?.trim() ?? "";
+
+    if (options.category) {
+        conditions.push("l.category LIKE ?");
+        params.push(`%${options.category}%`);
+    }
+
+    if (options.condition) {
+        conditions.push("l.condition = ?");
+        params.push(options.condition);
+    }
+
+    if (options.minPrice) {
+        conditions.push("l.price >= ?");
+        params.push(Number(options.minPrice));
+    }
+
+    if (options.maxPrice) {
+        conditions.push("l.price <= ?");
+        params.push(Number(options.maxPrice));
+    }
+
+    let join = "";
+    if (trimmedQuery) {
+        const matchTokens = trimmedQuery
+            .split(/\s+/)
+            .map((token) => token.replace(/"/g, '""').trim())
+            .filter(Boolean)
+            .map((token) => `"${token}"*`);
+
+        if (matchTokens.length > 0) {
+            join = "INNER JOIN listings_fts ON listings_fts.rowid = l.rowid";
+            conditions.push("listings_fts MATCH ?");
+            params.push(matchTokens.join(" AND "));
+        }
+    }
+
+    const parsedLimit = Number(options.limit);
+    const parsedOffset = Number(options.offset);
+    const limit = Number.isFinite(parsedLimit) && parsedLimit > 0
+        ? Math.min(Math.floor(parsedLimit), 100)
+        : 24;
+    const offset = Number.isFinite(parsedOffset) && parsedOffset >= 0
+        ? Math.floor(parsedOffset)
+        : 0;
+
+    params.push(limit, offset);
+
+    return {
+        params,
+        sql: `
+            SELECT l.*, u.name AS seller_name,
+                   (SELECT s3_url FROM listing_images WHERE listing_id = l.id ORDER BY sort_order ASC LIMIT 1) AS image_url
+            FROM listings l
+            ${join}
+            LEFT JOIN users u ON u.id = l.seller_id
+            WHERE ${conditions.join(" AND ")}
+            ORDER BY l.created_at DESC
+            LIMIT ? OFFSET ?
+        `,
+    };
+}
 
 const listingsRoutes = new Elysia()
     .use(jwt({ name: "jwt", secret: process.env.JWT_SECRET! }))
@@ -57,35 +131,10 @@ const listingsRoutes = new Elysia()
             limit?: string;
         };
 
-        const { page, limit, offset } = parsePagination(query);
+        const { sql, params } = buildListingsQuery({ category, condition, minPrice, maxPrice, q });
+        const listings = db.query(sql).all(...params);
 
-        const conditions: string[] = ["l.status = 'active'"];
-        const params: (string | number)[] = [];
-
-        if (category) { conditions.push("l.category = ?"); params.push(category); }
-        if (condition) { conditions.push("l.condition = ?"); params.push(condition); }
-        if (minPrice) { conditions.push("l.price >= ?"); params.push(Number(minPrice)); }
-        if (maxPrice) { conditions.push("l.price <= ?"); params.push(Number(maxPrice)); }
-        if (q) {
-            conditions.push("(l.title LIKE ? OR l.description LIKE ?)");
-            params.push(`%${q}%`, `%${q}%`);
-        }
-
-        const where = conditions.join(" AND ");
-
-        const total = (db.query(
-            `SELECT COUNT(*) as count FROM listings l WHERE ${where}`
-        ).get(...params) as { count: number }).count;
-
-        const listings = db.query(
-            `SELECT l.*, u.name AS seller_name,
-                    (SELECT s3_url FROM listing_images WHERE listing_id = l.id ORDER BY sort_order ASC LIMIT 1) AS image_url
-             FROM listings l
-             LEFT JOIN users u ON u.id = l.seller_id
-             WHERE ${where} ORDER BY l.created_at DESC LIMIT ? OFFSET ?`
-        ).all(...params, limit, offset);
-
-        return { listings, total, page, limit, status: 200 };
+        return { listings, status: 200 };
     })
 
     .get("/listings/popular", ({ query }) => {
@@ -98,6 +147,31 @@ const listingsRoutes = new Elysia()
              LEFT JOIN users u ON u.id = l.seller_id
              WHERE l.status = 'active' ORDER BY l.created_at DESC LIMIT ?`
         ).all(limit);
+
+        return { listings, status: 200 };
+    })
+
+    .get("/search", ({ query }) => {
+        const { category, min_price, max_price, limit, offset, q, condition } = query as {
+            category?: string;
+            min_price?: string;
+            max_price?: string;
+            limit?: string;
+            offset?: string;
+            q?: string;
+            condition?: string;
+        };
+
+        const { sql, params } = buildListingsQuery({
+            category,
+            condition,
+            minPrice: min_price,
+            maxPrice: max_price,
+            limit,
+            offset,
+            q,
+        });
+        const listings = db.query(sql).all(...params);
 
         return { listings, status: 200 };
     })
@@ -123,13 +197,21 @@ const listingsRoutes = new Elysia()
         if ('status' in payload) return payload;
 
         const listing = db.query("SELECT * FROM listings WHERE id = ? AND status != 'deleted'").get(params.id) as {
-            id: string; seller_id: number;
+            id: string; seller_id: number; status: string;
         } | null;
 
         if (!listing) return { message: "Listing not found", status: 404 };
         if (String(listing.seller_id) !== String(payload.id)) return { message: "Forbidden", status: 403 };
 
         const { title, description, price, is_free, category, condition, status } = body as PatchListingBody;
+
+        // Sold listings are locked: only allow status changes via this endpoint,
+        // not edits to title/price/etc. Mark-sold should use POST /listings/:id/mark-sold.
+        const isContentEdit = title !== undefined || description !== undefined ||
+            price !== undefined || is_free !== undefined || category !== undefined || condition !== undefined;
+        if (listing.status === "sold" && isContentEdit) {
+            return { message: "Cannot edit a sold listing", status: 409 };
+        }
 
         db.run(
             `UPDATE listings SET
@@ -147,6 +229,91 @@ const listingsRoutes = new Elysia()
 
         const updated = db.query("SELECT * FROM listings WHERE id = ?").get(params.id);
         return { listing: updated, status: 200 };
+    })
+
+    .post("/listings/:id/mark-sold", async ({ params, body, headers, jwt }) => {
+        const payload = await requireAuth(headers, jwt);
+        if ('status' in payload) return payload;
+
+        const listing = db.query(`
+            SELECT id, seller_id, status
+            FROM listings
+            WHERE id = ?
+        `).get(params.id) as {
+            id: string;
+            seller_id: number;
+            status: string;
+        } | null;
+
+        if (!listing || listing.status === "deleted") {
+            return { message: "Listing not found", status: 404 };
+        }
+        if (String(listing.seller_id) !== String(payload.id)) return { message: "Forbidden", status: 403 };
+        if (listing.status === "sold") {
+            return { message: "Listing is already sold", status: 409 };
+        }
+
+        const { buyer_id } = body as { buyer_id?: number | null };
+        const normalizedBuyerId = buyer_id == null ? null : Number(buyer_id);
+
+        if (normalizedBuyerId != null) {
+            if (!Number.isInteger(normalizedBuyerId) || normalizedBuyerId <= 0) {
+                return { message: "buyer_id must be a valid user id", status: 400 };
+            }
+            if (normalizedBuyerId === Number(payload.id)) {
+                return { message: "buyer_id cannot match the seller", status: 400 };
+            }
+
+            const buyer = db.query(`
+                SELECT id FROM users
+                WHERE id = ? AND status = 'active'
+            `).get(normalizedBuyerId);
+
+            if (!buyer) return { message: "Buyer not found", status: 404 };
+        }
+
+        const existingTransaction = db.query(`
+            SELECT id FROM transactions
+            WHERE listing_id = ?
+        `).get(params.id);
+
+        if (existingTransaction) {
+            return { message: "A transaction already exists for this listing", status: 409 };
+        }
+
+        const transactionId = crypto.randomUUID();
+        const soldAt = new Date().toISOString();
+
+        try {
+            db.transaction(() => {
+                db.run(`
+                    INSERT INTO transactions (id, listing_id, seller_id, buyer_id, sold_at)
+                    VALUES (?, ?, ?, ?, ?)
+                `, [transactionId, params.id, payload.id, normalizedBuyerId, soldAt]);
+
+                db.run(`
+                    UPDATE listings
+                    SET status = 'sold', updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ? AND status != 'sold'
+                `, [params.id]);
+            })();
+        } catch (err: unknown) {
+            // UNIQUE(listing_id) on transactions catches concurrent mark-sold races.
+            if ((err as { code?: string })?.code === "SQLITE_CONSTRAINT_UNIQUE") {
+                return { message: "A transaction already exists for this listing", status: 409 };
+            }
+            throw err;
+        }
+
+        const transaction = {
+            id: transactionId,
+            listing_id: params.id,
+            seller_id: Number(payload.id),
+            buyer_id: normalizedBuyerId,
+            sold_at: soldAt,
+        };
+
+        return { transaction, status: 201 };
     })
 
     .delete("/listings/:id", async ({ params, headers, jwt }) => {

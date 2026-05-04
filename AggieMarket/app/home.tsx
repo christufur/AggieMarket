@@ -1,12 +1,16 @@
 import { useEffect, useRef, useState, useCallback, memo } from "react";
 import {
   View, Pressable, ScrollView,
-  Switch, ActivityIndicator, Animated, useWindowDimensions, Image,
+  Switch, ActivityIndicator, Animated, useWindowDimensions, Image, Platform, KeyboardAvoidingView,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { LinearGradient } from "expo-linear-gradient";
+import { SafeAreaView } from "react-native-safe-area-context";
+
+import { useRouter, useFocusEffect } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
-// @ts-ignore
-import DatePicker from "react-datepicker";
+// react-datepicker is web-only; lazy require so native bundles don't try to load react-dom.
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const DatePicker: any = Platform.OS === "web" ? require("react-datepicker").default : null;
 import { colors } from "../theme/colors";
 import { useAuth } from "../context/AuthContext";
 import { useWebSocket } from "../context/WebSocketContext";
@@ -21,6 +25,10 @@ import { Separator } from "@/components/ui/separator";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
+import { Avatar } from "@/components/ui/Avatar";
+import { NavAvatar } from "@/components/ui/SiteHeader";
+import { Chip } from "@/components/ui/Chip";
+import { BottomNav } from "@/components/ui/BottomNav";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -101,6 +109,16 @@ const TAB_LABELS: { key: TabType; label: string }[] = [
   { key: "event", label: "Events" },
 ];
 
+// Mobile category icon strip config
+const MOBILE_CATEGORIES = [
+  { label: "All",       icon: "grid-outline"   as const, key: null        },
+  { label: "Textbooks", icon: "book-outline"   as const, key: "Textbooks" },
+  { label: "Tech",      icon: "laptop-outline" as const, key: "Tech"      },
+  { label: "Furniture", icon: "home-outline"   as const, key: "Furniture" },
+  { label: "Free",      icon: "leaf-outline"   as const, key: "Free"      },
+  { label: "Tutors",    icon: "star-outline"   as const, key: "Tutoring"  },
+];
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 // ─── Toast ────────────────────────────────────────────────────────────────────
@@ -143,10 +161,24 @@ function Toast({ message, visible }: { message: string; visible: boolean }) {
 
 // ─── Cards ────────────────────────────────────────────────────────────────────
 
-const ListingCard = memo(function ListingCard({ item }: { item: Listing }) {
+function SkeletonCard() {
+  return (
+    <View style={{ borderRadius: 12, overflow: "hidden", backgroundColor: "#fff", borderWidth: 1, borderColor: colors.border }}>
+      <View style={{ height: 208, backgroundColor: colors.bg }} />
+      <View style={{ padding: 16, gap: 10 }}>
+        <View style={{ height: 14, width: "70%", backgroundColor: colors.bg, borderRadius: 6 }} />
+        <View style={{ height: 12, width: "40%", backgroundColor: colors.bg, borderRadius: 6 }} />
+        <View style={{ height: 20, width: "30%", backgroundColor: colors.bg, borderRadius: 6 }} />
+      </View>
+    </View>
+  );
+}
+
+const ListingCard = memo(function ListingCard({ item, compact }: { item: Listing; compact?: boolean }) {
   const router = useRouter();
   const [hovered, setHovered] = useState(false);
   const label = item.is_free ? "Free" : item.price != null ? `$${item.price}` : "\u2014";
+  const imageHeight = compact ? 140 : 208;
 
   return (
     <Pressable
@@ -166,33 +198,52 @@ const ListingCard = memo(function ListingCard({ item }: { item: Listing }) {
           borderColor: hovered ? colors.primary : undefined,
         } as any}
       >
-        {item.image_url ? (
-          <Image
-            source={{ uri: API.mediaUrl(item.image_url!) }}
-            style={{ width: "100%" as any, height: 208, borderTopLeftRadius: 12, borderTopRightRadius: 12 }}
-            resizeMode="cover"
-          />
-        ) : (
-          <View className="w-full items-center justify-center border-b border-border" style={{ height: 208, backgroundColor: colors.primaryLight }}>
-            <Ionicons name="image-outline" size={40} color={colors.primary} style={{ opacity: 0.3 }} />
-          </View>
-        )}
-        <CardContent className="p-4 gap-2">
+        <View style={{ position: "relative" }}>
+          {item.image_url ? (
+            <Image
+              source={{ uri: API.mediaUrl(item.image_url!) }}
+              style={{ width: "100%" as any, height: imageHeight, borderTopLeftRadius: 12, borderTopRightRadius: 12 }}
+              resizeMode="cover"
+            />
+          ) : (
+            <View className="w-full items-center justify-center border-b border-border" style={{ height: imageHeight, backgroundColor: colors.primaryLight, borderTopLeftRadius: 12, borderTopRightRadius: 12 }}>
+              <Ionicons name="image-outline" size={40} color={colors.primary} style={{ opacity: 0.3 }} />
+            </View>
+          )}
+          {/* FREE badge overlay */}
+          {!!item.is_free && (
+            <View style={{
+              position: "absolute", top: 8, left: 8,
+              backgroundColor: colors.success, borderRadius: 6,
+              paddingHorizontal: 6, paddingVertical: 2,
+            }}>
+              <Text style={{ color: "#fff", fontSize: 10, fontWeight: "700" }}>FREE</Text>
+            </View>
+          )}
+        </View>
+        <CardContent className="p-4 gap-2" style={compact ? { padding: 10 } : undefined}>
           <Text className="text-sm font-bold text-foreground font-display leading-[19px]" numberOfLines={2}>{item.title}</Text>
-          {item.seller_name && (
+          {item.seller_name && !compact && (
             <Text className="text-xs text-muted-foreground mt-0.5">by {item.seller_name}</Text>
           )}
-          <Text className="text-xl font-extrabold font-display tracking-tight" style={{ color: item.is_free ? colors.success : colors.primary }}>{label}</Text>
-          <View className="flex-row gap-1.5 mt-1 flex-wrap">
-            {item.condition && (
-              <Badge variant="outline" className="px-2 py-0.5 rounded">
-                <Text className="text-[10px] font-medium">{item.condition}</Text>
+          <Text
+            className="font-extrabold font-display tracking-tight"
+            style={{ color: item.is_free ? colors.success : colors.primary, fontSize: compact ? 16 : 20 }}
+          >
+            {label}
+          </Text>
+          {!compact && (
+            <View className="flex-row gap-1.5 mt-1 flex-wrap">
+              {item.condition && (
+                <Badge variant="outline" className="px-2 py-0.5 rounded">
+                  <Text className="text-[10px] font-medium">{item.condition}</Text>
+                </Badge>
+              )}
+              <Badge className="px-2 py-0.5 rounded" style={{ backgroundColor: colors.primaryLight, borderColor: colors.primaryBorder, borderWidth: 1 }}>
+                <Text className="text-[10px] font-medium" style={{ color: "#5E072D" }}>{item.category}</Text>
               </Badge>
-            )}
-            <Badge className="px-2 py-0.5 rounded" style={{ backgroundColor: colors.primaryLight, borderColor: colors.primaryBorder, borderWidth: 1 }}>
-              <Text className="text-[10px] font-medium" style={{ color: "#5E072D" }}>{item.category}</Text>
-            </Badge>
-          </View>
+            </View>
+          )}
         </CardContent>
       </Card>
     </Pressable>
@@ -480,12 +531,27 @@ function CreatePostModal({
 
   return (
     <Dialog open={visible} onOpenChange={(open) => { if (!open) onClose(); }}>
-      <DialogContent className="w-[480px] max-w-[480px] p-0">
+      <DialogContent className="w-full max-w-[480px] p-0">
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={{ flex: 1 }}
+          keyboardVerticalOffset={0}
+        >
         <DialogHeader className="flex-row justify-between items-center px-6 py-4 border-b border-border mb-0">
           <DialogTitle>
             <Text className="text-base font-bold text-foreground">New Post</Text>
           </DialogTitle>
-          <Pressable onPress={onClose} disabled={saving}>
+          <Pressable
+            onPress={onClose}
+            disabled={saving}
+            hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
+            style={{
+              width: 36, height: 36, borderRadius: 18,
+              borderWidth: 1.5, borderColor: colors.border,
+              backgroundColor: colors.bg,
+              alignItems: 'center', justifyContent: 'center',
+            }}
+          >
             <Text className="text-base text-muted-foreground font-light">{"\u2715"}</Text>
           </Pressable>
         </DialogHeader>
@@ -505,7 +571,7 @@ function CreatePostModal({
           ))}
         </View>
 
-        <ScrollView className="px-6 pt-1 pb-6" showsVerticalScrollIndicator={false}>
+        <ScrollView className="flex-1" contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 4, paddingBottom: 60 }} showsVerticalScrollIndicator={true} keyboardShouldPersistTaps="handled">
           <Text className="text-[11px] font-bold tracking-wide text-muted-foreground uppercase mt-4 mb-1.5">Photos</Text>
           <View className="flex-row flex-wrap gap-2">
             {images.map((img, i) => (
@@ -658,7 +724,7 @@ function CreatePostModal({
               />
 
               <Text className="text-[11px] font-bold tracking-wide text-muted-foreground uppercase mt-4 mb-1.5">Start Date & Time *</Text>
-              {mounted && (
+              {Platform.OS === "web" && mounted && DatePicker && (
                 <DatePicker
                   selected={form.startsAt}
                   onChange={(date: Date | null) => set("startsAt", date)}
@@ -675,9 +741,21 @@ function CreatePostModal({
                   portalId="datepicker-portal"
                 />
               )}
+              {Platform.OS !== "web" && (
+                <Input
+                  placeholder="YYYY-MM-DD HH:MM (e.g. 2026-05-12 18:30)"
+                  value={form.startsAt ? form.startsAt.toISOString().slice(0, 16).replace("T", " ") : ""}
+                  onChangeText={(v) => {
+                    const d = new Date(v.replace(" ", "T"));
+                    set("startsAt", isNaN(d.getTime()) ? null : d);
+                  }}
+                  editable={!saving}
+                  className="text-sm"
+                />
+              )}
 
               <Text className="text-[11px] font-bold tracking-wide text-muted-foreground uppercase mt-4 mb-1.5">End Date & Time</Text>
-              {mounted && (
+              {Platform.OS === "web" && mounted && DatePicker && (
                 <DatePicker
                   selected={form.endsAt}
                   onChange={(date: Date | null) => set("endsAt", date)}
@@ -693,6 +771,19 @@ function CreatePostModal({
                   className="am-datepicker"
                   withPortal
                   portalId="datepicker-portal"
+                />
+              )}
+              {Platform.OS !== "web" && (
+                <Input
+                  placeholder="YYYY-MM-DD HH:MM (optional)"
+                  value={form.endsAt ? form.endsAt.toISOString().slice(0, 16).replace("T", " ") : ""}
+                  onChangeText={(v) => {
+                    if (!v.trim()) { set("endsAt", null); return; }
+                    const d = new Date(v.replace(" ", "T"));
+                    set("endsAt", isNaN(d.getTime()) ? null : d);
+                  }}
+                  editable={!saving}
+                  className="text-sm"
                 />
               )}
               <View className="flex-row justify-between items-center mt-4">
@@ -739,8 +830,99 @@ function CreatePostModal({
             }
           </Button>
         </ScrollView>
+        </KeyboardAvoidingView>
       </DialogContent>
     </Dialog>
+  );
+}
+
+// ─── Digest sub-components ────────────────────────────────────────────────────
+
+function StatusTile({ icon, n, label, sub, tone, onPress }: {
+  icon: string; n: string | number; label: string; sub: string;
+  tone: 'primary' | 'success' | 'warn';
+  onPress?: () => void;
+}) {
+  const tc = {
+    primary: { bg: colors.primaryLight, fg: colors.primary, br: colors.primary200 },
+    success: { bg: colors.successLight, fg: colors.success, br: '#c8e6c9' },
+    warn:    { bg: colors.warningLight, fg: colors.warning, br: '#ffe082' },
+  }[tone];
+  const inner = (
+    <>
+      <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center' }}>
+        <Ionicons name={icon as any} size={18} color={tc.fg} />
+      </View>
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text style={{ fontSize: 14, fontWeight: '700', color: colors.ink }}>
+          <Text style={{ color: tc.fg, fontWeight: '800' }}>{n}</Text>{' '}{label}
+        </Text>
+        <Text style={{ fontSize: 11, color: colors.dark, marginTop: 2 }}>{sub}</Text>
+      </View>
+    </>
+  );
+  const containerStyle = { backgroundColor: tc.bg, borderWidth: 1, borderColor: tc.br, borderRadius: 14, padding: 14, flexDirection: 'row' as const, alignItems: 'center' as const, gap: 12 };
+  if (onPress) {
+    return (
+      <Pressable onPress={onPress} style={[containerStyle, { cursor: 'pointer' as any }]}>
+        {inner}
+      </Pressable>
+    );
+  }
+  return <View style={containerStyle}>{inner}</View>;
+}
+
+function DigestSectionHeader({ icon, title, sub, onSeeAll }: {
+  icon: string; title: string; sub?: string; onSeeAll?: () => void;
+}) {
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <Ionicons name={icon as any} size={18} color={colors.primary} />
+        <Text style={{ fontSize: 20, fontWeight: '800', letterSpacing: -0.4, color: colors.ink }}>{title}</Text>
+        {sub && <Text style={{ fontSize: 12, color: colors.dark }}>· {sub}</Text>}
+      </View>
+      {onSeeAll && (
+        <Pressable onPress={onSeeAll}>
+          <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>See all →</Text>
+        </Pressable>
+      )}
+    </View>
+  );
+}
+
+function RailCard({ title, link, onLinkPress, children }: { title: string; link?: string; onLinkPress?: () => void; children: React.ReactNode }) {
+  return (
+    <View style={{ backgroundColor: colors.white, borderWidth: 1, borderColor: colors.border, borderRadius: 14, padding: 16 }}>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <Text style={{ fontSize: 14, fontWeight: '800', color: colors.ink }}>{title}</Text>
+        {link && (
+          onLinkPress ? (
+            <Pressable onPress={onLinkPress} style={{ cursor: 'pointer' as any }}>
+              <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>{link}</Text>
+            </Pressable>
+          ) : (
+            <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>{link}</Text>
+          )
+        )}
+      </View>
+      {children}
+    </View>
+  );
+}
+
+function DateBlock({ when }: { when: string }) {
+  const [datePart] = (when || '').split(' · ');
+  const [mon, day] = (datePart || '').split(' ');
+  return (
+    <View style={{ width: 44, borderWidth: 1.5, borderColor: colors.primary200, borderRadius: 8, overflow: 'hidden', flexShrink: 0 }}>
+      <View style={{ backgroundColor: colors.primary, paddingVertical: 2, alignItems: 'center' }}>
+        <Text style={{ color: colors.white, fontSize: 9, fontWeight: '800', letterSpacing: 0.6 }}>{(mon || '').toUpperCase()}</Text>
+      </View>
+      <View style={{ paddingVertical: 4, alignItems: 'center' }}>
+        <Text style={{ fontSize: 18, fontWeight: '800', color: colors.primary }}>{day}</Text>
+      </View>
+    </View>
   );
 }
 
@@ -753,6 +935,7 @@ export default function HomeWebScreen() {
   const { unreadCount } = useWebSocket();
 
   const [listings, setListings] = useState<Listing[]>([]);
+  const [listingResults, setListingResults] = useState<Listing[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
   const [activeTab, setActiveTab] = useState<TabType>("listing");
@@ -763,25 +946,63 @@ export default function HomeWebScreen() {
   const [toastVisible, setToastVisible] = useState(false);
   const [toastMessage, setToastMessage] = useState("Posted!");
   const [searchFocused, setSearchFocused] = useState(false);
+  const [loadingListings, setLoadingListings] = useState(true);
+  const [loadingServices, setLoadingServices] = useState(true);
+  const [loadingEvents, setLoadingEvents] = useState(true);
+  const [errorListings, setErrorListings] = useState(false);
+  const [errorServices, setErrorServices] = useState(false);
+  const [errorEvents, setErrorEvents] = useState(false);
+  const [browseMode, setBrowseMode] = useState(false);
 
   const fetchListings = useCallback(() => {
+    setLoadingListings(true);
+    setErrorListings(false);
     fetch(API.listings)
       .then((r) => r.json())
-      .then((d) => { if (d.listings) setListings(d.listings); });
+      .then((d) => { if (d.listings) setListings(d.listings); })
+      .catch(() => setErrorListings(true))
+      .finally(() => setLoadingListings(false));
+  }, []);
+
+  const fetchListingResults = useCallback((searchQuery: string, category: string | null, condition: string | null) => {
+    const params = new URLSearchParams();
+    const trimmedQuery = searchQuery.trim();
+
+    if (trimmedQuery) params.set("q", trimmedQuery);
+    if (category) params.set("category", category);
+    if (condition) params.set("condition", condition);
+    params.set("limit", "100");
+
+    const url = params.toString() ? `${API.search}?${params.toString()}` : API.search;
+
+    setLoadingListings(true);
+    fetch(url)
+      .then((r) => r.json())
+      .then((d) => { if (d.listings) setListingResults(d.listings); })
+      .catch(() => {})
+      .finally(() => setLoadingListings(false));
   }, []);
 
   const fetchServices = useCallback(() => {
     if (!token) return;
+    setLoadingServices(true);
+    setErrorServices(false);
     fetch(API.services, { headers: { Authorization: `Bearer ${token}` } })
       .then((r) => r.json())
-      .then((d) => { if (d.services) setServices(d.services); });
+      .then((d) => { if (d.services) setServices(d.services); })
+      .catch(() => setErrorServices(true))
+      .finally(() => setLoadingServices(false));
   }, [token]);
 
   const fetchEvents = useCallback(() => {
     if (!token) return;
-    fetch(API.events, { headers: { Authorization: `Bearer ${token}` } })
+    setLoadingEvents(true);
+    setErrorEvents(false);
+    fetch(`${API.events}?include_past=0`, { headers: { Authorization: `Bearer ${token}` } })
       .then((r) => r.json())
-      .then((d) => { if (d.events) setEvents(d.events); });
+      .then((d) => { if (d.events) setEvents(d.events); })
+      .catch(() => setErrorEvents(true))
+      .finally(() => setLoadingEvents(false));
   }, [token]);
 
   useEffect(() => {
@@ -789,6 +1010,26 @@ export default function HomeWebScreen() {
     fetchServices();
     fetchEvents();
   }, [fetchListings, fetchServices, fetchEvents]);
+
+  // Refetch every time the home screen regains focus so the digest reflects
+  // listings/services/events created or modified on other screens.
+  useFocusEffect(
+    useCallback(() => {
+      fetchListings();
+      fetchServices();
+      fetchEvents();
+    }, [fetchListings, fetchServices, fetchEvents])
+  );
+
+  useEffect(() => {
+    if (activeTab !== "listing") return;
+
+    const timeout = setTimeout(() => {
+      fetchListingResults(query, activeCategory, activeCondition);
+    }, 200);
+
+    return () => clearTimeout(timeout);
+  }, [activeTab, activeCategory, activeCondition, query, fetchListingResults]);
 
   const switchTab = useCallback((tab: TabType) => {
     setActiveTab(tab);
@@ -801,12 +1042,13 @@ export default function HomeWebScreen() {
 
   const handleSaved = useCallback((type: PostType) => {
     fetchListings();
+    fetchListingResults(query, activeCategory, activeCondition);
     fetchServices();
     fetchEvents();
     setToastMessage(type === "listing" ? "Listing posted!" : type === "service" ? "Service posted!" : "Event posted!");
     setToastVisible(false);
     setTimeout(() => setToastVisible(true), 50);
-  }, [fetchListings, fetchServices, fetchEvents]);
+  }, [activeCategory, activeCondition, fetchListingResults, fetchListings, fetchServices, fetchEvents, query]);
 
   // Filtered data per tab
   function matchesCat(category: string, filter: string | null) {
@@ -814,10 +1056,7 @@ export default function HomeWebScreen() {
     return category.split(",").some((c) => c.trim().toLowerCase() === filter.toLowerCase());
   }
 
-  const filteredListings = listings.filter((l) => {
-    const matchQ = !query || l.title.toLowerCase().includes(query.toLowerCase());
-    return matchQ && matchesCat(l.category, activeCategory) && (!activeCondition || l.condition === activeCondition);
-  });
+  const filteredListings = listingResults;
 
   const filteredServices = services.filter((s) => {
     const matchQ = !query || s.title.toLowerCase().includes(query.toLowerCase());
@@ -839,10 +1078,28 @@ export default function HomeWebScreen() {
     activeTab === "service" ? filteredServices.length :
     filteredEvents.length;
 
+  const isLoading =
+    activeTab === "listing" ? loadingListings :
+    activeTab === "service" ? loadingServices :
+    loadingEvents;
+
+  const hasError =
+    activeTab === "listing" ? errorListings :
+    activeTab === "service" ? errorServices :
+    errorEvents;
+
+  const retryFetch =
+    activeTab === "listing" ? fetchListings :
+    activeTab === "service" ? fetchServices :
+    fetchEvents;
+
   const isMobile = width < 768;
   const SIDEBAR = isMobile ? 0 : 220;
   const contentWidth = Math.min(width - (isMobile ? 16 : 48), 1100);
   const gridCols = isMobile ? (width < 480 ? 1 : 2) : 3;
+
+  const firstName = user?.name?.split(" ")[0] || "Aggie";
+  const showHotRail = !isMobile && listings.length > 0 && !loadingListings && !query && !activeCategory;
 
   const tabPlaceholder =
     activeTab === "listing" ? "Search listings\u2026" :
@@ -859,205 +1116,485 @@ export default function HomeWebScreen() {
     activeTab === "service" ? "No services found" :
     "No events found";
 
-  return (
-    <View className="flex-1 bg-background">
-      {/* ── Navbar ── */}
-      <View
-        className="bg-card border-b border-border h-[60px] justify-center z-[100]"
-        style={{ position: "sticky" as any, top: 0, paddingHorizontal: isMobile ? 12 : 24 }}
-      >
-        <View className="flex-row items-center self-center w-full gap-3" style={{ maxWidth: contentWidth }}>
-          <Pressable className="flex-row items-center gap-2 shrink-0" onPress={() => router.push("/home")}>
-            <View className="bg-primary px-[7px] py-[3px] rounded">
-              <Text className="text-primary-foreground text-[11px] font-extrabold tracking-wide">AM</Text>
-            </View>
-            {!isMobile && <Text className="text-base font-bold text-foreground tracking-tight font-display">Aggie Market</Text>}
-          </Pressable>
+  const picksForYou = listings.slice(0, isMobile ? 2 : 3);
+  const justPosted  = (listingResults.length ? listingResults : listings).slice(0, 4);
+  const weekEvents  = events.slice(0, 3);
+  const hireServices = services.slice(0, 4);
+  const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 
-          <View
-            className={`flex-1 flex-row items-center bg-background border-[1.5px] rounded-lg px-3 h-[38px] gap-2 ${searchFocused ? "border-foreground" : "border-border"}`}
-          >
-            <Ionicons name="search-outline" size={16} color={colors.dark} />
-            <Input
-              className="flex-1 text-[13px] border-0 h-auto p-0"
-              placeholder={isMobile ? "Search..." : tabPlaceholder}
-              value={query}
-              onChangeText={setQuery}
-              onFocus={() => setSearchFocused(true)}
-              onBlur={() => setSearchFocused(false)}
-              style={{ outlineStyle: "none" } as any}
-            />
+  if (isMobile) {
+    // ── MOBILE: curved header + category strip + tile feed + BottomNav ──────
+    return (
+      <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.primary }}>
+      <View style={{ flex: 1, backgroundColor: colors.bg }}>
+        {/* Gradient header */}
+        <LinearGradient
+          colors={[colors.primary, colors.primaryDark]}
+          start={{ x: 0, y: 0 }} end={{ x: 0.4, y: 1 }}
+          style={{ borderBottomLeftRadius: 24, borderBottomRightRadius: 24, paddingTop: 14, paddingBottom: 22, paddingHorizontal: 18, gap: 12 }}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={{ color: 'rgba(255,255,255,0.65)', fontSize: 10, fontWeight: '700', letterSpacing: 2, textTransform: 'uppercase' }} numberOfLines={1}>NMSU CAMPUS</Text>
+              <Text style={{ color: colors.white, fontSize: 24, fontWeight: '800', letterSpacing: -0.5 }} numberOfLines={1} adjustsFontSizeToFit>Aggie Market</Text>
+            </View>
+            <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center', flexShrink: 0 }}>
+              <Pressable
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                style={{ width: 36, height: 36, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' }}
+                onPress={() => router.push('/inbox')}
+              >
+                <Ionicons name="chatbubble-outline" size={17} color={colors.white} />
+              </Pressable>
+              <Pressable hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} onPress={() => router.push('/profile')}>
+                <Avatar name={user?.name || 'A'} size={36} />
+              </Pressable>
+            </View>
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.95)', borderRadius: 12, paddingHorizontal: 12, height: 44, gap: 8 }}>
+            <Ionicons name="search-outline" size={17} color={colors.dark} />
+            <Input className="flex-1 text-[14px] border-0 h-auto p-0" placeholder="Search listings, services…" value={query} onChangeText={setQuery} placeholderTextColor={colors.dark} style={{ outlineStyle: 'none', backgroundColor: 'transparent', color: colors.ink } as any} />
+            {query.length > 0 && <Pressable onPress={() => setQuery('')}><Ionicons name="close-circle" size={17} color={colors.dark} /></Pressable>}
+          </View>
+        </LinearGradient>
+
+
+        {/* ── Daily Digest (mobile) ── */}
+        <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 14, paddingBottom: 100, gap: 22 } as any}>
+
+          {/* Greeting strip */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <Avatar name={user?.name || 'Aggie'} size={40} />
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={{ fontSize: 12, color: colors.dark }}>{today}</Text>
+              <Text style={{ fontSize: 20, fontWeight: '800', letterSpacing: -0.4, color: colors.ink }} numberOfLines={1}>Hey {firstName} 👋</Text>
+            </View>
           </View>
 
-          <View className="flex-row items-center gap-2 shrink-0">
-            {!isMobile && (
-              <>
-                <Pressable className="w-9 h-9 border-[1.5px] border-border rounded-lg items-center justify-center" onPress={() => router.push("/saved")}>
-                  <Ionicons name="heart-outline" size={16} color={colors.dark} />
-                </Pressable>
-                <Pressable className="w-9 h-9 border-[1.5px] border-border rounded-lg items-center justify-center" onPress={() => router.push("/inbox")} style={{ position: "relative" as any }}>
-                  <Ionicons name="chatbubble-outline" size={16} color={colors.dark} />
-                  {unreadCount > 0 && (
-                    <View style={{
-                      position: "absolute", top: -4, right: -4,
-                      backgroundColor: colors.primary, borderRadius: 100,
-                      minWidth: 16, height: 16, paddingHorizontal: 3,
-                      alignItems: "center", justifyContent: "center",
-                      borderWidth: 1.5, borderColor: colors.white,
-                    }}>
-                      <Text style={{ color: colors.white, fontSize: 9, fontWeight: "700" }}>
-                        {unreadCount > 99 ? "99+" : unreadCount}
-                      </Text>
-                    </View>
-                  )}
-                </Pressable>
-              </>
-            )}
-            <Pressable className="w-9 h-9 border-[1.5px] border-border rounded-lg items-center justify-center" onPress={() => router.push("/profile")}>
-              <Ionicons name="person-outline" size={16} color={colors.dark} />
+          {/* Status tiles — compact 3-up, single-line labels */}
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <Pressable onPress={() => router.push('/inbox')}
+              style={{ flex: 1, backgroundColor: colors.primaryLight, borderRadius: 12, padding: 12, gap: 4, borderWidth: 1, borderColor: colors.primary200 }}>
+              <Ionicons name="chatbubble-outline" size={18} color={colors.primary} />
+              <Text style={{ fontSize: 22, fontWeight: '800', color: colors.ink, lineHeight: 26 }}>{unreadCount || 0}</Text>
+              <Text style={{ fontSize: 11, color: colors.dark, fontWeight: '600' }} numberOfLines={1}>Messages</Text>
             </Pressable>
-            <Button size="sm" onPress={() => setModalVisible(true)}>
-              <Text className="text-primary-foreground text-[13px] font-bold">{isMobile ? "+" : "+ New Post"}</Text>
+            <Pressable onPress={() => router.push('/browse?tab=listing' as any)}
+              style={{ flex: 1, backgroundColor: colors.successLight, borderRadius: 12, padding: 12, gap: 4, borderWidth: 1, borderColor: '#c8e6c9' }}>
+              <Ionicons name="pricetag-outline" size={18} color={colors.success} />
+              <Text style={{ fontSize: 22, fontWeight: '800', color: colors.ink, lineHeight: 26 }}>{listings.length}</Text>
+              <Text style={{ fontSize: 11, color: colors.dark, fontWeight: '600' }} numberOfLines={1}>Listings</Text>
+            </Pressable>
+            <Pressable onPress={() => router.push('/browse?tab=event' as any)}
+              style={{ flex: 1, backgroundColor: colors.warningLight, borderRadius: 12, padding: 12, gap: 4, borderWidth: 1, borderColor: '#ffe082' }}>
+              <Ionicons name="calendar-outline" size={18} color={colors.warning} />
+              <Text style={{ fontSize: 22, fontWeight: '800', color: colors.ink, lineHeight: 26 }}>{events.length}</Text>
+              <Text style={{ fontSize: 11, color: colors.dark, fontWeight: '600' }} numberOfLines={1}>Events</Text>
+            </Pressable>
+          </View>
+
+          {/* Picks for you */}
+          {picksForYou.length > 0 && (
+            <View>
+              <DigestSectionHeader icon="sparkles-outline" title="Picks for you" sub="Trending on campus" onSeeAll={() => router.push('/browse?tab=listing' as any)} />
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+                {picksForYou.map(item => {
+                  const label = item.is_free ? 'Free' : item.price != null ? `$${item.price}` : '—';
+                  return (
+                    <Pressable key={item.id} onPress={() => router.push(`/listing/${item.id}`)}
+                      style={{ width: '48%', backgroundColor: colors.white, borderWidth: 1, borderColor: colors.border, borderRadius: 14, overflow: 'hidden' }}>
+                      {item.image_url
+                        ? <Image source={{ uri: API.mediaUrl(item.image_url) }} style={{ width: '100%' as any, aspectRatio: 1 }} resizeMode="cover" />
+                        : <View style={{ width: '100%' as any, aspectRatio: 1, backgroundColor: colors.primaryLight, alignItems: 'center', justifyContent: 'center' }}>
+                            <Ionicons name="image-outline" size={32} color={colors.primary} style={{ opacity: 0.3 }} />
+                          </View>
+                      }
+                      <View style={{ padding: 10, gap: 2 }}>
+                        <Text style={{ fontSize: 13, fontWeight: '700', color: colors.ink }} numberOfLines={1}>{item.title}</Text>
+                        <Text style={{ fontSize: 14, fontWeight: '800', color: item.is_free ? colors.success : colors.primary }} numberOfLines={1}>{label}</Text>
+                        <Text style={{ fontSize: 11, color: colors.dark }} numberOfLines={1}>by {item.seller_name || 'Aggie'}</Text>
+                      </View>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+          )}
+
+          {/* Just posted */}
+          {justPosted.length > 0 && (
+            <View>
+              <DigestSectionHeader icon="flame-outline" title="Just posted" sub="Last 24 hours" onSeeAll={() => router.push('/browse?tab=listing' as any)} />
+              <View style={{ backgroundColor: colors.white, borderWidth: 1, borderColor: colors.border, borderRadius: 14, overflow: 'hidden' }}>
+                {justPosted.map((item, i) => {
+                  const label = item.is_free ? 'Free' : item.price != null ? `$${item.price}` : '—';
+                  return (
+                    <Pressable key={item.id} onPress={() => router.push(`/listing/${item.id}`)}
+                      style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, borderBottomWidth: i < justPosted.length - 1 ? 1 : 0, borderBottomColor: colors.border }}>
+                      {item.image_url
+                        ? <Image source={{ uri: API.mediaUrl(item.image_url) }} style={{ width: 56, height: 56, borderRadius: 8 }} resizeMode="cover" />
+                        : <View style={{ width: 56, height: 56, borderRadius: 8, backgroundColor: colors.primaryLight, alignItems: 'center', justifyContent: 'center' }}>
+                            <Ionicons name="image-outline" size={20} color={colors.primary} style={{ opacity: 0.3 }} />
+                          </View>
+                      }
+                      <View style={{ flex: 1, minWidth: 0 }}>
+                        <Text style={{ fontSize: 13, fontWeight: '700', color: colors.ink }} numberOfLines={1}>{item.title}</Text>
+                        <Text style={{ fontSize: 11, color: colors.dark, marginTop: 2 }} numberOfLines={1}>{item.seller_name || 'Seller'} · {item.category}</Text>
+                      </View>
+                      <Text style={{ fontSize: 15, fontWeight: '800', color: item.is_free ? colors.success : colors.primary }}>{label}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+          )}
+
+          {/* Aggies for hire */}
+          {hireServices.length > 0 && (
+            <View>
+              <DigestSectionHeader icon="person-outline" title="Aggies for hire" onSeeAll={() => router.push('/browse?tab=service' as any)} />
+              <View style={{ gap: 10 }}>
+                {hireServices.map(s => {
+                  const priceLabelStr = s.price != null ? `$${s.price}${s.price_type === 'hourly' ? '/hr' : ''}` : 'Contact';
+                  return (
+                    <Pressable key={s.id} onPress={() => router.push(`/service/${s.id}`)}
+                      style={{ backgroundColor: colors.white, borderWidth: 1, borderColor: colors.border, borderRadius: 14, padding: 12, flexDirection: 'row', gap: 12 }}>
+                      <Avatar name={s.provider_name || 'P'} size={42} />
+                      <View style={{ flex: 1, minWidth: 0 }}>
+                        <Text style={{ fontSize: 13, fontWeight: '700', color: colors.ink }} numberOfLines={2}>{s.title}</Text>
+                        <Text style={{ fontSize: 11, color: colors.dark, marginTop: 2 }} numberOfLines={1}>{s.provider_name} · {s.category}</Text>
+                      </View>
+                      <View style={{ alignItems: 'flex-end', gap: 4 }}>
+                        <Text style={{ fontSize: 14, fontWeight: '800', color: colors.primary }}>{priceLabelStr}</Text>
+                      </View>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+          )}
+
+          {/* This week's events */}
+          {weekEvents.length > 0 && (
+            <View>
+              <DigestSectionHeader icon="calendar-outline" title="On campus this week" onSeeAll={() => router.push('/browse?tab=event' as any)} />
+              <View style={{ backgroundColor: colors.white, borderWidth: 1, borderColor: colors.border, borderRadius: 14, padding: 14, gap: 12 }}>
+                {weekEvents.map(e => (
+                  <Pressable key={e.id} onPress={() => router.push(`/event/${e.id}`)} style={{ flexDirection: 'row', gap: 12, alignItems: 'flex-start' }}>
+                    <DateBlock when={e.starts_at ? new Date(e.starts_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''} />
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Text style={{ fontSize: 13, fontWeight: '700', lineHeight: 18, color: colors.ink }} numberOfLines={2}>{e.title}</Text>
+                      <Text style={{ fontSize: 11, color: colors.dark, marginTop: 2 }} numberOfLines={1}>{e.location}</Text>
+                      {!!e.is_free && <Chip variant="success" style={{ marginTop: 6 }}>FREE</Chip>}
+                    </View>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+          )}
+
+        </ScrollView>
+
+        {/* Bottom Nav */}
+        <BottomNav
+          active="home"
+          unreadCount={unreadCount}
+          onPress={k => {
+            if (k === 'post')   setModalVisible(true);
+            if (k === 'inbox')  router.push('/inbox');
+            if (k === 'me')     router.push('/profile');
+            if (k === 'browse') router.push('/browse');
+          }}
+        />
+
+        <Toast message={toastMessage} visible={toastVisible} />
+        <CreatePostModal visible={modalVisible} onClose={closeModal} onSaved={handleSaved} token={token} />
+      </View>
+      </SafeAreaView>
+    );
+  }
+
+  // ── DESKTOP: Daily Digest layout ───────────────────────────────────────────
+  return (
+    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+      {/* ── Desktop Navbar ── */}
+      <View style={{ position: 'sticky' as any, top: 0, zIndex: 100, backgroundColor: colors.white, borderBottomWidth: 1, borderBottomColor: colors.border, height: 64, justifyContent: 'center', paddingHorizontal: 24 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, maxWidth: 1240, alignSelf: 'center', width: '100%' as any }}>
+          {/* Left cluster: logo */}
+          <View style={{ flexShrink: 0, flexDirection: 'row', alignItems: 'center', gap: 14, minWidth: 0 }}>
+            <Pressable style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }} onPress={() => router.push('/home')}>
+              <View style={{ backgroundColor: colors.primary, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
+                <Text style={{ color: colors.white, fontSize: 12, fontWeight: '800', letterSpacing: 0.6 }}>AM</Text>
+              </View>
+              <Text style={{ fontSize: 17, fontWeight: '800', color: colors.ink, letterSpacing: -0.3 }}>Aggie Market</Text>
+            </Pressable>
+          </View>
+
+          {/* Center: search — flex grow, capped, shrinks safely on narrow screens */}
+          <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg, borderWidth: 1.5, borderColor: searchFocused ? colors.primary : colors.border, borderRadius: 10, paddingHorizontal: 12, height: 42, gap: 8, minWidth: 120, maxWidth: 520 }}>
+            <Ionicons name="search-outline" size={16} color={colors.dark} />
+            <Input className="flex-1 text-[13px] border-0 h-auto p-0" placeholder="Search Aggie Market" value={query} onChangeText={setQuery}
+              onFocus={() => setSearchFocused(true)} onBlur={() => setSearchFocused(false)} placeholderTextColor={colors.dark} style={{ outlineStyle: 'none', backgroundColor: 'transparent', color: colors.ink, minWidth: 0 } as any} />
+          </View>
+
+          {/* Right cluster */}
+          <View style={{ flexShrink: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 8 }}>
+            <Pressable style={{ width: 38, height: 38, borderWidth: 1.5, borderColor: colors.border, borderRadius: 10, alignItems: 'center', justifyContent: 'center' }} onPress={() => router.push('/saved')}>
+              <Ionicons name="heart-outline" size={16} color={colors.dark} />
+            </Pressable>
+            <Pressable style={{ width: 38, height: 38, borderWidth: 1.5, borderColor: colors.border, borderRadius: 10, alignItems: 'center', justifyContent: 'center', position: 'relative' as any }} onPress={() => router.push('/inbox')}>
+              <Ionicons name="chatbubble-outline" size={16} color={colors.dark} />
+              {unreadCount > 0 && (
+                <View style={{ position: 'absolute', top: -3, right: -3, backgroundColor: colors.primary, borderRadius: 999, minWidth: 16, height: 16, paddingHorizontal: 3, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: colors.white }}>
+                  <Text style={{ color: colors.white, fontSize: 9, fontWeight: '800' }}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
+                </View>
+              )}
+            </Pressable>
+            <Pressable onPress={() => router.push('/profile')}>
+              <NavAvatar name={user?.name || 'A'} size={32} />
+            </Pressable>
+            <Button size="sm" onPress={() => setModalVisible(true)} style={{ backgroundColor: colors.primary, borderRadius: 10, height: 38, paddingHorizontal: 16 }}>
+              <Text style={{ color: colors.white, fontSize: 13, fontWeight: '700' }}>+ New Post</Text>
             </Button>
           </View>
         </View>
       </View>
 
-      <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
-        {/* ── Banner ── */}
-        <div className="banner-pattern" style={{ background: "linear-gradient(135deg, #8C0B42, #5E072D)" }}>
-          <View className="px-6 py-6">
-            <View className="self-center w-full flex-row items-center justify-between" style={{ maxWidth: contentWidth }}>
-              <View className="flex-1 gap-1">
-                <Text className="text-2xl font-bold text-primary-foreground tracking-tight font-display">
-                  Marketplace
-                </Text>
-                <Text className="text-sm" style={{ color: "rgba(255,255,255,0.6)" }}>
-                  {listings.length} listings · {services.length} services · {events.length} events
-                </Text>
+      {/* ── Main content ── */}
+      <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
+        <View style={{ maxWidth: 1240, alignSelf: 'center', width: '100%' as any, padding: 28, paddingBottom: 60 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 28 } as any}>
+
+            {/* ── Left column ── */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 0 } as any}>
+
+              {/* Greeting */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 4 }}>
+                <Avatar name={user?.name || 'Aggie'} size={44} />
+                <View>
+                  <Text style={{ fontSize: 13, color: colors.dark }}>{today}</Text>
+                  <Text style={{ fontSize: 28, fontWeight: '800', letterSpacing: -0.6, color: colors.ink }}>Hey {firstName} 👋</Text>
+                </View>
               </View>
-            </View>
-          </View>
-        </div>
-
-        {/* ── Tab Bar ── */}
-        <View
-          className="flex-row bg-card border-b border-border items-center gap-1 py-2"
-          style={{ paddingHorizontal: Math.max(24, (width - contentWidth) / 2) }}
-        >
-          {TAB_LABELS.map(({ key, label }) => (
-            <Pressable
-              key={key}
-              className={`px-4 py-2 rounded-full ${activeTab === key ? "" : ""}`}
-              style={activeTab === key ? { backgroundColor: colors.primaryLight } : undefined}
-              onPress={() => switchTab(key)}
-            >
-              <Text
-                className="text-sm font-semibold"
-                style={{ color: activeTab === key ? colors.primary : colors.dark }}
-              >
-                {label}
+              <Text style={{ fontSize: 15, color: colors.dark, marginBottom: 24, maxWidth: 520, lineHeight: 22 }}>
+                Your Aggie Market digest — picks based on what's hot on campus.
               </Text>
-            </Pressable>
-          ))}
-        </View>
 
-        {/* ── Main Content ── */}
-        <View className="flex-row pt-8 pb-12 gap-6 self-center w-full" style={{ maxWidth: contentWidth, paddingHorizontal: isMobile ? 12 : 24 }}>
+              {/* Status tiles */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12, marginBottom: 28 } as any}>
+                <StatusTile icon="chatbubble-outline" n={unreadCount || 0} label="new messages" sub="Tap to open inbox" tone="primary" onPress={() => router.push('/inbox')} />
+                <StatusTile icon="heart-outline"       n={listings.length} label="active listings" sub="Campus marketplace" tone="success" onPress={() => router.push('/browse?tab=listing' as any)} />
+                <StatusTile icon="calendar-outline"    n={events.length}   label="events this week" sub="On & near campus" tone="warn" onPress={() => router.push('/browse?tab=event' as any)} />
+              </div>
 
-          {/* Sidebar */}
-          {!isMobile && <View className="shrink-0" style={{ width: SIDEBAR }}>
-            <Text className="text-[10px] font-extrabold tracking-[1.5px] text-muted-foreground uppercase mb-3 mt-1">Categories</Text>
-            <Pressable
-              className="py-2.5 px-3 rounded-md mb-1"
-              style={!activeCategory ? { backgroundColor: colors.primaryLight } : undefined}
-              onPress={() => setActiveCategory(null)}
-            >
-              <Text className="text-[13px] font-medium" style={{ color: !activeCategory ? colors.primary : colors.dark, fontWeight: !activeCategory ? "600" : "500" }}>All</Text>
-            </Pressable>
-            {currentCategories.map((c) => (
-              <Pressable
-                key={c}
-                className="py-2.5 px-3 rounded-md mb-1"
-                style={activeCategory === c ? { backgroundColor: colors.primaryLight } : undefined}
-                onPress={() => setActiveCategory(activeCategory === c ? null : c)}
-              >
-                <Text className="text-[13px] font-medium" style={{ color: activeCategory === c ? colors.primary : colors.dark, fontWeight: activeCategory === c ? "600" : "500" }}>{c}</Text>
-              </Pressable>
-            ))}
+              {/* Picks for you */}
+              {picksForYou.length > 0 && (
+                <View style={{ marginBottom: 32 }}>
+                  <DigestSectionHeader icon="sparkles-outline" title="Picks for you" sub="Trending on campus" onSeeAll={() => router.push('/browse?tab=listing' as any)} />
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16 } as any}>
+                    {picksForYou.map(item => {
+                      const label = item.is_free ? 'Free' : item.price != null ? `$${item.price}` : '—';
+                      return (
+                        <Pressable key={item.id} onPress={() => router.push(`/listing/${item.id}`)}
+                          style={{ backgroundColor: colors.white, borderWidth: 1, borderColor: colors.border, borderRadius: 14, overflow: 'hidden' }}>
+                          {item.image_url
+                            ? <Image source={{ uri: API.mediaUrl(item.image_url) }} style={{ width: '100%' as any, height: 140 }} resizeMode="cover" />
+                            : <View style={{ height: 140, backgroundColor: colors.primaryLight, alignItems: 'center', justifyContent: 'center' }}>
+                                <Ionicons name="image-outline" size={32} color={colors.primary} style={{ opacity: 0.3 }} />
+                              </View>
+                          }
+                          <View style={{ padding: 12 }}>
+                            <Text style={{ fontSize: 14, fontWeight: '700', lineHeight: 19, color: colors.ink }} numberOfLines={2}>{item.title}</Text>
+                            <Text style={{ fontSize: 11, color: colors.primary, marginTop: 4, fontStyle: 'italic' }}>Because it's trending this week</Text>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
+                              <Text style={{ fontSize: 16, fontWeight: '800', color: item.is_free ? colors.success : colors.primary, letterSpacing: -0.3 }}>{label}</Text>
+                              <Chip variant="outline">{item.condition || item.category}</Chip>
+                            </View>
+                          </View>
+                        </Pressable>
+                      );
+                    })}
+                  </div>
+                </View>
+              )}
 
-            {activeTab === "listing" && (
-              <>
-                <Separator className="my-5" />
-                <Text className="text-[10px] font-extrabold tracking-[1.5px] text-muted-foreground uppercase mb-3 mt-1">Condition</Text>
-                <Pressable
-                  className="py-2.5 px-3 rounded-md mb-1"
-                  style={!activeCondition ? { backgroundColor: colors.primaryLight } : undefined}
-                  onPress={() => setActiveCondition(null)}
-                >
-                  <Text className="text-[13px] font-medium" style={{ color: !activeCondition ? colors.primary : colors.dark, fontWeight: !activeCondition ? "600" : "500" }}>Any</Text>
+              {/* Just posted */}
+              {justPosted.length > 0 && (
+                <View style={{ marginBottom: 32 }}>
+                  <DigestSectionHeader icon="flame-outline" title="Just posted" sub="Within the last 24 hours" onSeeAll={() => router.push('/browse?tab=listing' as any)} />
+                  <View style={{ backgroundColor: colors.white, borderWidth: 1, borderColor: colors.border, borderRadius: 14, overflow: 'hidden' }}>
+                    {justPosted.map((item, i) => {
+                      const label = item.is_free ? 'Free' : item.price != null ? `$${item.price}` : '—';
+                      return (
+                        <Pressable key={item.id} onPress={() => router.push(`/listing/${item.id}`)}
+                          style={{ flexDirection: 'row', alignItems: 'center', gap: 14, padding: 14, borderBottomWidth: i < justPosted.length - 1 ? 1 : 0, borderBottomColor: colors.border }}>
+                          {item.image_url
+                            ? <Image source={{ uri: API.mediaUrl(item.image_url) }} style={{ width: 64, height: 64, borderRadius: 8 }} resizeMode="cover" />
+                            : <View style={{ width: 64, height: 64, borderRadius: 8, backgroundColor: colors.primaryLight, alignItems: 'center', justifyContent: 'center' }}>
+                                <Ionicons name="image-outline" size={22} color={colors.primary} style={{ opacity: 0.3 }} />
+                              </View>
+                          }
+                          <View style={{ flex: 1, minWidth: 0 }}>
+                            <Text style={{ fontSize: 14, fontWeight: '700', color: colors.ink }} numberOfLines={1}>{item.title}</Text>
+                            <Text style={{ fontSize: 12, color: colors.dark, marginTop: 2 }}>{item.seller_name || 'Seller'} · {item.category}</Text>
+                          </View>
+                          <Text style={{ fontSize: 17, fontWeight: '800', color: item.is_free ? colors.success : colors.primary, letterSpacing: -0.3 }}>{label}</Text>
+                          <Pressable onPress={() => router.push(`/listing/${item.id}`)}
+                            style={{ backgroundColor: colors.primaryLight, borderWidth: 1, borderColor: colors.primary200, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 7 }}>
+                            <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>View</Text>
+                          </Pressable>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </View>
+              )}
+
+              {/* Aggies for hire */}
+              {hireServices.length > 0 && (
+                <View style={{ marginBottom: 32 }}>
+                  <DigestSectionHeader icon="person-outline" title="Aggies for hire this week" onSeeAll={() => router.push('/browse?tab=service' as any)} />
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 16 } as any}>
+                    {hireServices.map(s => {
+                      const priceLabel = s.price != null ? `$${s.price}${s.price_type === 'hourly' ? '/hr' : ''}` : 'Contact';
+                      return (
+                        <Pressable key={s.id} onPress={() => router.push(`/service/${s.id}`)}
+                          style={{ backgroundColor: colors.white, borderWidth: 1, borderColor: colors.border, borderRadius: 14, padding: 14, flexDirection: 'row', gap: 14 }}>
+                          <Avatar name={s.provider_name || 'P'} size={48} />
+                          <View style={{ flex: 1, minWidth: 0 }}>
+                            <Text style={{ fontSize: 14, fontWeight: '700', color: colors.ink }} numberOfLines={2}>{s.title}</Text>
+                            <Text style={{ fontSize: 12, color: colors.dark, marginTop: 2 }}>{s.provider_name} · {s.category}</Text>
+                          </View>
+                          <View style={{ alignItems: 'flex-end', gap: 6 }}>
+                            <Text style={{ fontSize: 16, fontWeight: '800', color: colors.primary }}>{priceLabel}</Text>
+                            <View style={{ backgroundColor: colors.primary, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 }}>
+                              <Text style={{ color: colors.white, fontSize: 12, fontWeight: '700' }}>Hire</Text>
+                            </View>
+                          </View>
+                        </Pressable>
+                      );
+                    })}
+                  </div>
+                </View>
+              )}
+            </div>
+
+            {/* ── Right rail ── */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 } as any}>
+
+              {/* Events */}
+              {weekEvents.length > 0 && (
+                <RailCard title="On campus this week" link="Browse all" onLinkPress={() => router.push('/browse?tab=event' as any)}>
+                  <View style={{ gap: 12 }}>
+                    {weekEvents.map(e => (
+                      <Pressable key={e.id} onPress={() => router.push(`/event/${e.id}`)} style={{ flexDirection: 'row', gap: 12, alignItems: 'flex-start' }}>
+                        <DateBlock when={e.starts_at ? new Date(e.starts_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''} />
+                        <View style={{ flex: 1, minWidth: 0 }}>
+                          <Text style={{ fontSize: 13, fontWeight: '700', lineHeight: 18, color: colors.ink }} numberOfLines={2}>{e.title}</Text>
+                          <Text style={{ fontSize: 11, color: colors.dark, marginTop: 2 }} numberOfLines={1}>{e.location}</Text>
+                          {!!e.is_free && <Chip variant="success" style={{ marginTop: 6 }}>FREE</Chip>}
+                        </View>
+                      </Pressable>
+                    ))}
+                  </View>
+                </RailCard>
+              )}
+
+              {/* Browse all listings */}
+              <RailCard title="Browse everything">
+                <View style={{ gap: 6 }}>
+                  {TAB_LABELS.map(({ key, label }) => (
+                    <Pressable key={key} onPress={() => router.push(`/browse?tab=${key}` as any)}
+                      style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.border, cursor: 'pointer' as any }}>
+                      <Text style={{ fontSize: 13, fontWeight: '600', color: colors.ink }}>{label}</Text>
+                      <Ionicons name="arrow-forward" size={14} color={colors.dark} />
+                    </Pressable>
+                  ))}
+                </View>
+              </RailCard>
+            </div>
+          </div>
+
+          {/* ── Browse mode full grid ── */}
+          {browseMode && (
+            <View style={{ marginTop: 32 }}>
+              {/* Header */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                  <Text style={{ fontSize: 26, fontWeight: '800', letterSpacing: -0.5, color: colors.ink }}>
+                    All {TAB_LABELS.find(t => t.key === activeTab)?.label}
+                  </Text>
+                  {!isLoading && (
+                    <View style={{ backgroundColor: colors.primaryLight, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3, borderWidth: 1, borderColor: colors.primary200 }}>
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>{currentCount}</Text>
+                    </View>
+                  )}
+                </View>
+                <Pressable onPress={() => setBrowseMode(false)}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.white }}>
+                  <Ionicons name="close-outline" size={16} color={colors.dark} />
+                  <Text style={{ fontSize: 13, fontWeight: '600', color: colors.dark }}>Close</Text>
                 </Pressable>
-                {CONDITIONS.map((c) => (
-                  <Pressable
-                    key={c}
-                    className="py-2.5 px-3 rounded-md mb-1"
-                    style={activeCondition === c ? { backgroundColor: colors.primaryLight } : undefined}
-                    onPress={() => setActiveCondition(activeCondition === c ? null : c)}
-                  >
-                    <Text className="text-[13px] font-medium" style={{ color: activeCondition === c ? colors.primary : colors.dark, fontWeight: activeCondition === c ? "600" : "500" }}>{c}</Text>
+              </View>
+
+              {/* Tab switcher */}
+              <View style={{ flexDirection: 'row', gap: 6, marginBottom: 20 }}>
+                {TAB_LABELS.map(({ key, label }) => (
+                  <Pressable key={key} onPress={() => switchTab(key)}
+                    style={{ paddingHorizontal: 16, paddingVertical: 8, borderRadius: 999, backgroundColor: activeTab === key ? colors.primary : colors.white, borderWidth: 1.5, borderColor: activeTab === key ? colors.primary : colors.border }}>
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: activeTab === key ? colors.white : colors.dark }}>{label}</Text>
                   </Pressable>
                 ))}
-              </>
-            )}
-          </View>}
-
-          {/* Grid */}
-          <View className="flex-1 min-w-0">
-            <View className="flex-row justify-between items-baseline mb-5 pb-4 border-b border-border">
-              <Text className="text-xl font-bold text-foreground tracking-tight">
-                {activeCategory ?? (activeTab === "listing" ? "All Listings" : activeTab === "service" ? "All Services" : "All Events")}
-                {activeCondition ? ` \u00b7 ${activeCondition}` : ""}
-              </Text>
-              <Text className="text-[13px] text-muted-foreground">{currentCount} result{currentCount !== 1 ? "s" : ""}</Text>
-            </View>
-
-            {currentCount === 0 ? (
-              <View className="items-center py-20 gap-3">
-                <Text className="text-[40px] text-border">{"\u25ce"}</Text>
-                <Text className="text-lg font-bold text-foreground">{emptyNoResultMsg}</Text>
-                <Text className="text-sm text-muted-foreground">
-                  {query ? `Nothing matches "${query}"` : "Be the first to post one."}
-                </Text>
-                <Button className="mt-2" onPress={() => setModalVisible(true)}>
-                  <Text className="text-primary-foreground text-[13px] font-bold">{emptyPostLabel}</Text>
-                </Button>
               </View>
-            ) : (
-              <div style={{ display: "grid", gridTemplateColumns: `repeat(${gridCols}, 1fr)`, gap: 16 }}>
-                {activeTab === "listing" && filteredListings.map((item) => (
-                  <ListingCard key={item.id} item={item} />
-                ))}
-                {activeTab === "service" && filteredServices.map((item) => (
-                  <ServiceCard key={item.id} item={item} />
-                ))}
-                {activeTab === "event" && filteredEvents.map((item) => (
-                  <EventCard key={item.id} item={item} />
-                ))}
-              </div>
-            )}
-          </View>
-        </View>
 
+              {/* Category filter chips */}
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 20 }}
+                contentContainerStyle={{ gap: 8, flexDirection: 'row' } as any}>
+                <Pressable onPress={() => setActiveCategory(null)}
+                  style={{ paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999, borderWidth: 1.5, borderColor: activeCategory === null ? colors.primary : colors.border, backgroundColor: activeCategory === null ? colors.primaryLight : colors.white }}>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: activeCategory === null ? colors.primary : colors.dark }}>All</Text>
+                </Pressable>
+                {currentCategories.map((cat) => (
+                  <Pressable key={cat} onPress={() => setActiveCategory(cat)}
+                    style={{ paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999, borderWidth: 1.5, borderColor: activeCategory === cat ? colors.primary : colors.border, backgroundColor: activeCategory === cat ? colors.primaryLight : colors.white }}>
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: activeCategory === cat ? colors.primary : colors.dark }}>{cat}</Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+
+              {/* Grid content */}
+              {isLoading ? (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 20 } as any}>
+                  {[1,2,3,4,5,6].map(i => <SkeletonCard key={i} />)}
+                </div>
+              ) : hasError ? (
+                <View style={{ alignItems: 'center', paddingVertical: 60, gap: 12 }}>
+                  <Ionicons name="cloud-offline-outline" size={40} color={colors.mid} />
+                  <Text style={{ fontSize: 15, fontWeight: '600', color: colors.ink }}>Could not load</Text>
+                  <Button variant="outline" onPress={retryFetch}><Text>Retry</Text></Button>
+                </View>
+              ) : currentCount === 0 ? (
+                <View style={{ alignItems: 'center', paddingVertical: 60, gap: 12 }}>
+                  <Text style={{ fontSize: 36, color: colors.border }}>◎</Text>
+                  <Text style={{ fontSize: 17, fontWeight: '700', color: colors.ink }}>{emptyNoResultMsg}</Text>
+                  <Text style={{ fontSize: 13, color: colors.dark }}>{query ? `Nothing matches "${query}"` : 'Be the first to post one.'}</Text>
+                  <Button onPress={() => setModalVisible(true)}><Text className="text-primary-foreground text-[13px] font-bold">{emptyPostLabel}</Text></Button>
+                </View>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 20 } as any}>
+                  {activeTab === 'listing' && filteredListings.map(item => <ListingCard key={item.id} item={item} />)}
+                  {activeTab === 'service' && filteredServices.map(item => <ServiceCard key={item.id} item={item} />)}
+                  {activeTab === 'event'   && filteredEvents.map(item => <EventCard key={item.id} item={item} />)}
+                </div>
+              )}
+            </View>
+          )}
+        </View>
       </ScrollView>
 
       <Toast message={toastMessage} visible={toastVisible} />
-
-      <CreatePostModal
-        visible={modalVisible}
-        onClose={closeModal}
-        onSaved={handleSaved}
-        token={token}
-      />
+      <CreatePostModal visible={modalVisible} onClose={closeModal} onSaved={handleSaved} token={token} />
     </View>
   );
 }
+
