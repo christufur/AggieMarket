@@ -20,6 +20,7 @@ import { SiteHeader, NavAvatar } from "@/components/ui/SiteHeader";
 import { BottomNav } from "@/components/ui/BottomNav";
 import { useWebSocket } from "@/context/WebSocketContext";
 import { confirmAsync } from "@/lib/dialogs";
+import { RateUserDialog } from "@/components/RateUserDialog";
 
 type ListingDetail = {
   id: string;
@@ -35,6 +36,12 @@ type ListingDetail = {
   created_at: string;
   seller_name: string | null;
   images: { url: string; sort_order: number }[];
+  transaction: {
+    id: string;
+    buyer_id: number | null;
+    seller_id: number;
+    sold_at: string | null;
+  } | null;
 };
 
 export default function ListingDetailScreenWeb() {
@@ -66,6 +73,11 @@ export default function ListingDetailScreenWeb() {
 
   const REPORT_REASONS = ["Spam", "Inappropriate", "Counterfeit", "Other"];
 
+  // Rating state
+  const [rateOpen, setRateOpen] = useState(false);
+  const [myRatingExists, setMyRatingExists] = useState(false);
+  const [counterpartyName, setCounterpartyName] = useState<string | null>(null);
+
   useEffect(() => {
     if (!id) return;
     fetch(API.listing(id))
@@ -84,6 +96,26 @@ export default function ListingDetailScreenWeb() {
       .then((r) => { if (!r.ok) throw new Error(); return r.json(); })
       .then((data) => { setSaved(data.saved); setSavedId(data.saved_id); });
   }, [id, token]);
+
+  useEffect(() => {
+    if (!token || !user || !listing?.transaction?.id) {
+      setMyRatingExists(false);
+      setCounterpartyName(null);
+      return;
+    }
+    const txnId = listing.transaction.id;
+    const isBuyer = listing.transaction.buyer_id === user.id;
+    const isSeller = listing.transaction.seller_id === user.id;
+    if (!isBuyer && !isSeller) return;
+    fetch(API.transaction(txnId), { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => r.json())
+      .then((data) => {
+        if (!data.transaction) return;
+        setMyRatingExists(!!data.transaction.my_rating);
+        setCounterpartyName(data.transaction.counterparty?.name ?? null);
+      })
+      .catch(() => {});
+  }, [token, user, listing?.transaction?.id]);
 
   // Edit state
   const [editOpen, setEditOpen] = useState(false);
@@ -161,7 +193,18 @@ export default function ListingDetailScreenWeb() {
         body: JSON.stringify({ buyer_id: parsedBuyerId ?? null }),
       });
       if (res.ok) {
-        setListing((prev) => prev ? { ...prev, status: "sold" } : prev);
+        const data = await res.json().catch(() => null);
+        const txn = data?.transaction ?? null;
+        setListing((prev) => prev ? {
+          ...prev,
+          status: "sold",
+          transaction: txn ? {
+            id: txn.id,
+            buyer_id: txn.buyer_id ?? null,
+            seller_id: txn.seller_id,
+            sold_at: txn.sold_at ?? null,
+          } : prev.transaction,
+        } : prev);
         setSoldOpen(false);
         setSoldBuyerId("");
       }
@@ -409,6 +452,38 @@ export default function ListingDetailScreenWeb() {
                     <View className="rounded-md px-4 py-2 items-center" style={{ backgroundColor: colors.errorLight }}>
                       <Text className="text-sm font-bold" style={{ color: colors.error }}>This listing has been sold</Text>
                     </View>
+                  )}
+                  {listing.status === "sold" && listing.transaction?.id && user && (
+                    listing.transaction.buyer_id === user.id || listing.transaction.seller_id === user.id
+                  ) && (
+                    myRatingExists ? (
+                      <View
+                        className="rounded-md px-4 py-3 flex-row items-center justify-center"
+                        style={{ backgroundColor: colors.successLight, gap: 8 }}
+                      >
+                        <Ionicons name="checkmark-circle" size={16} color={colors.success} />
+                        <Text className="text-sm font-semibold" style={{ color: colors.success }}>
+                          You rated this transaction
+                        </Text>
+                      </View>
+                    ) : (
+                      <Pressable
+                        onPress={() => setRateOpen(true)}
+                        style={{
+                          flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+                          backgroundColor: colors.primary, borderRadius: 8,
+                          paddingVertical: 12, paddingHorizontal: 16,
+                          cursor: "pointer" as any,
+                        }}
+                      >
+                        <Ionicons name="star-outline" size={16} color={colors.white} />
+                        <Text style={{ fontSize: 14, fontWeight: "700", color: colors.white }}>
+                          {counterpartyName
+                            ? `Leave a review for ${counterpartyName}`
+                            : "Leave a review"}
+                        </Text>
+                      </Pressable>
+                    )
                   )}
                 </CardHeader>
 
@@ -736,6 +811,16 @@ export default function ListingDetailScreenWeb() {
           </DialogContent>
         </Dialog>
       </ScrollView>
+
+      <RateUserDialog
+        open={rateOpen}
+        onClose={() => setRateOpen(false)}
+        transactionId={listing?.transaction?.id ?? null}
+        counterpartyName={counterpartyName}
+        listingTitle={listing?.title ?? null}
+        token={token}
+        onSubmitted={() => setMyRatingExists(true)}
+      />
 
       {Platform.OS !== "web" && (
         <BottomNav

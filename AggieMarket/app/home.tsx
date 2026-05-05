@@ -1321,7 +1321,7 @@ export default function HomeWebScreen() {
       <View style={{ position: 'sticky' as any, top: 0, zIndex: 100, backgroundColor: colors.white, borderBottomWidth: 1, borderBottomColor: colors.border, height: 64, justifyContent: 'center', paddingHorizontal: 24 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, maxWidth: 1240, alignSelf: 'center', width: '100%' as any }}>
           {/* Left cluster: logo */}
-          <View style={{ flexShrink: 0, flexDirection: 'row', alignItems: 'center', gap: 14, minWidth: 0 }}>
+          <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 14, minWidth: 0 }}>
             <Pressable style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }} onPress={() => router.push('/home')}>
               <View style={{ backgroundColor: colors.primary, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
                 <Text style={{ color: colors.white, fontSize: 12, fontWeight: '800', letterSpacing: 0.6 }}>AM</Text>
@@ -1330,15 +1330,15 @@ export default function HomeWebScreen() {
             </Pressable>
           </View>
 
-          {/* Center: search — flex grow, capped, shrinks safely on narrow screens */}
-          <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg, borderWidth: 1.5, borderColor: searchFocused ? colors.primary : colors.border, borderRadius: 10, paddingHorizontal: 12, height: 42, gap: 8, minWidth: 120, maxWidth: 520 }}>
+          {/* Center: search — fixed width, centered by equal-flex side clusters */}
+          <View style={{ flexShrink: 0, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg, borderWidth: 1.5, borderColor: searchFocused ? colors.primary : colors.border, borderRadius: 10, paddingHorizontal: 12, height: 42, gap: 8, width: 520 }}>
             <Ionicons name="search-outline" size={16} color={colors.dark} />
             <Input className="flex-1 text-[13px] border-0 h-auto p-0" placeholder="Search Aggie Market" value={query} onChangeText={setQuery}
               onFocus={() => setSearchFocused(true)} onBlur={() => setSearchFocused(false)} placeholderTextColor={colors.dark} style={{ outlineStyle: 'none', backgroundColor: 'transparent', color: colors.ink, minWidth: 0 } as any} />
           </View>
 
           {/* Right cluster */}
-          <View style={{ flexShrink: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 8 }}>
+          <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 8 }}>
             <Pressable style={{ width: 38, height: 38, borderWidth: 1.5, borderColor: colors.border, borderRadius: 10, alignItems: 'center', justifyContent: 'center' }} onPress={() => router.push('/saved')}>
               <Ionicons name="heart-outline" size={16} color={colors.dark} />
             </Pressable>

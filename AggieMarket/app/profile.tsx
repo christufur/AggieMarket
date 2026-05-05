@@ -23,9 +23,10 @@ import { Avatar } from "@/components/ui/Avatar";
 import { SiteHeader, NavAvatar } from "@/components/ui/SiteHeader";
 import { BottomNav } from "@/components/ui/BottomNav";
 import { useWebSocket } from "@/context/WebSocketContext";
-import type { ProfileData, ListingItem, ServiceItem, EventItem, RatingItem } from "@/types";
+import type { ProfileData, ListingItem, ServiceItem, EventItem, RatingItem, PendingRatingTransaction } from "@/types";
 import { fmtDate, fmtJoined } from "@/lib/utils";
 import { confirmAsync } from "@/lib/dialogs";
+import { RateUserDialog } from "@/components/RateUserDialog";
 
 // ── Main ─────────────────────────────────────────────────────────────────────
 
@@ -60,6 +61,19 @@ export default function ProfileScreen() {
   const [saving, setSaving] = useState(false);
   const [reviewsModalOpen, setReviewsModalOpen] = useState(false);
 
+  const [pendingTxns, setPendingTxns] = useState<PendingRatingTransaction[]>([]);
+  const [rateOpen, setRateOpen] = useState(false);
+  const [rateTxn, setRateTxn] = useState<PendingRatingTransaction | null>(null);
+
+  const fetchPendingRatings = useCallback(async () => {
+    if (!token) return;
+    try {
+      const res = await fetch(API.pendingRatings, { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      if (Array.isArray(data.transactions)) setPendingTxns(data.transactions);
+    } catch (err) { console.error("Pending ratings fetch error:", err); }
+  }, [token]);
+
   const fetchProfile = useCallback(async () => {
     if (!user || !token) return;
     try {
@@ -80,9 +94,10 @@ export default function ProfileScreen() {
       if (sData.services) setServices(sData.services);
       if (eData.events) setEvents(eData.events);
       if (rData.ratings) setRatings(rData.ratings);
+      await fetchPendingRatings();
     } catch (err) { console.error("Profile fetch error:", err); }
     finally { setLoading(false); }
-  }, [user, token]);
+  }, [user, token, fetchPendingRatings]);
 
   const loadMoreRatings = async () => {
     if (!user) return;
@@ -326,6 +341,75 @@ export default function ProfileScreen() {
                   )}
                 </CardContent>
               </Card>
+
+              {/* Pending reviews to leave */}
+              {pendingTxns.length > 0 && (
+                <Card style={{ borderColor: colors.primary, borderWidth: 1 }}>
+                  <CardHeader>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                      <Ionicons name="star-outline" size={14} color={colors.primary} />
+                      <Text style={{ fontSize: 13, fontWeight: "700", color: colors.ink }}>
+                        Reviews to leave
+                      </Text>
+                      <View style={{
+                        paddingHorizontal: 8, paddingVertical: 2,
+                        backgroundColor: colors.primary, borderRadius: 100,
+                      }}>
+                        <Text style={{ fontSize: 11, fontWeight: "700", color: colors.white }}>
+                          {pendingTxns.length}
+                        </Text>
+                      </View>
+                    </View>
+                  </CardHeader>
+                  <CardContent>
+                    <View style={{ gap: 10 }}>
+                      {pendingTxns.slice(0, 5).map((t) => (
+                        <View
+                          key={t.id}
+                          style={{
+                            flexDirection: "row", alignItems: "center", gap: 10,
+                            paddingVertical: 8,
+                            borderBottomWidth: 1, borderBottomColor: colors.border,
+                          }}
+                        >
+                          <Avatar name={t.counterparty_name ?? "U"} size={32} />
+                          <View style={{ flex: 1 }}>
+                            <Text
+                              style={{ fontSize: 13, fontWeight: "600", color: colors.ink }}
+                              numberOfLines={1}
+                            >
+                              {t.counterparty_name ?? "Unknown"}
+                            </Text>
+                            <Text
+                              style={{ fontSize: 11, color: colors.dark }}
+                              numberOfLines={1}
+                            >
+                              {t.my_role === "buyer" ? "Bought" : "Sold"}: {t.listing_title}
+                            </Text>
+                          </View>
+                          <Pressable
+                            onPress={() => { setRateTxn(t); setRateOpen(true); }}
+                            style={{
+                              paddingHorizontal: 10, paddingVertical: 6,
+                              backgroundColor: colors.primary, borderRadius: 6,
+                              cursor: "pointer" as any,
+                            }}
+                          >
+                            <Text style={{ fontSize: 12, fontWeight: "700", color: colors.white }}>
+                              Rate
+                            </Text>
+                          </Pressable>
+                        </View>
+                      ))}
+                      {pendingTxns.length > 5 && (
+                        <Text style={{ fontSize: 11, color: colors.dark, paddingTop: 4 }}>
+                          + {pendingTxns.length - 5} more
+                        </Text>
+                      )}
+                    </View>
+                  </CardContent>
+                </Card>
+              )}
 
               {/* Reviews summary */}
               <Card>
@@ -822,6 +906,23 @@ export default function ProfileScreen() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <RateUserDialog
+        open={rateOpen}
+        onClose={() => setRateOpen(false)}
+        transactionId={rateTxn?.id ?? null}
+        counterpartyName={rateTxn?.counterparty_name ?? null}
+        listingTitle={rateTxn?.listing_title ?? null}
+        token={token}
+        onSubmitted={(rating) => {
+          setRatings((prev) => [rating, ...prev]);
+          setPendingTxns((prev) => prev.filter((p) => p.id !== rateTxn?.id));
+          setProfile((p) => p ? {
+            ...p,
+            rating_count: p.rating_count + 1,
+          } : p);
+        }}
+      />
+
       {Platform.OS !== "web" && (
         <BottomNav
           active="me"

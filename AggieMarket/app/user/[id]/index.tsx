@@ -14,6 +14,9 @@ import { Separator } from "@/components/ui/separator";
 import { Avatar } from "@/components/ui/Avatar";
 import { SiteHeader, NavAvatar } from "@/components/ui/SiteHeader";
 import { BottomNav } from "@/components/ui/BottomNav";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from "@/components/ui/dialog";
 import { useWebSocket } from "@/context/WebSocketContext";
 import type { ProfileData, ListingItem, ServiceItem, EventItem, RatingItem } from "@/types";
 import { fmtDate, fmtJoined, isPastDay } from "@/lib/utils";
@@ -33,6 +36,19 @@ export default function PublicProfileScreen() {
   const [loading, setLoading] = useState(true);
   const [contentTab, setContentTab] = useState<"listings" | "services" | "events">("listings");
   const [listingsTab, setListingsTab] = useState<"active" | "sold">("active");
+  const [reviewsModalOpen, setReviewsModalOpen] = useState(false);
+  const [ratingsLoading, setRatingsLoading] = useState(false);
+
+  const loadMoreRatings = async () => {
+    if (!id) return;
+    setRatingsLoading(true);
+    try {
+      const userId = Number(id);
+      const res = await fetch(`${API.userRatings(userId)}?limit=20&offset=${ratings.length}`);
+      const data = await res.json();
+      if (data.ratings) setRatings((prev) => [...prev, ...data.ratings]);
+    } finally { setRatingsLoading(false); }
+  };
 
   // If viewing own profile, redirect
   useEffect(() => {
@@ -272,6 +288,17 @@ export default function PublicProfileScreen() {
                           </View>
                         ))}
                       </View>
+
+                      {ratings.length > 0 && (
+                        <Pressable
+                          onPress={() => setReviewsModalOpen(true)}
+                          style={{ alignSelf: "flex-start", paddingVertical: 6, cursor: "pointer" as any }}
+                        >
+                          <Text style={{ fontSize: 13, fontWeight: "600", color: colors.primary }}>
+                            View all reviews →
+                          </Text>
+                        </Pressable>
+                      )}
                     </View>
                   )}
                 </CardContent>
@@ -519,6 +546,85 @@ export default function PublicProfileScreen() {
           </View>
         </View>
       </ScrollView>
+
+      {/* All Reviews Dialog */}
+      <Dialog open={reviewsModalOpen} onOpenChange={setReviewsModalOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <Text style={{ fontSize: 16, fontWeight: "700", color: colors.ink }}>All Reviews</Text>
+                {profile && profile.rating_count > 0 && (
+                  <View style={{
+                    flexDirection: "row", alignItems: "center", gap: 4,
+                    paddingHorizontal: 8, paddingVertical: 3,
+                    backgroundColor: colors.primaryLight, borderRadius: 100,
+                  }}>
+                    <Ionicons name="star" size={11} color={colors.primary} />
+                    <Text style={{ fontSize: 12, fontWeight: "600", color: colors.primary }}>
+                      {profile.rating_avg.toFixed(1)} ({profile.rating_count})
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </DialogTitle>
+          </DialogHeader>
+          <ScrollView style={{ maxHeight: 500 }} showsVerticalScrollIndicator={true}>
+            {ratings.length === 0 ? (
+              <View style={{ alignItems: "center", paddingVertical: 40 }}>
+                <Text style={{ fontSize: 14, color: colors.dark }}>No reviews yet</Text>
+              </View>
+            ) : (
+              <View style={{ gap: 0 }}>
+                {ratings.map((r) => (
+                  <View key={r.id} style={{
+                    flexDirection: "row", gap: 12,
+                    paddingVertical: 14,
+                    borderBottomWidth: 1, borderBottomColor: colors.border,
+                  }}>
+                    <Avatar name={r.reviewer_name ?? "U"} size={36} />
+                    <View style={{ flex: 1, gap: 4 }}>
+                      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                        <Text style={{ fontSize: 13, fontWeight: "600", color: colors.ink }}>{r.reviewer_name ?? "Anonymous"}</Text>
+                        <Text style={{ fontSize: 12, color: colors.dark }}>{fmtDate(r.created_at)}</Text>
+                      </View>
+                      <View style={{ flexDirection: "row", gap: 2 }}>
+                        {[1, 2, 3, 4, 5].map((i) => (
+                          <Ionicons
+                            key={i}
+                            name={i <= r.stars ? "star" : "star-outline"}
+                            size={13}
+                            color={i <= r.stars ? colors.primary : colors.border}
+                          />
+                        ))}
+                      </View>
+                      {r.body ? <Text style={{ fontSize: 13, color: colors.ink, marginTop: 2 }}>{r.body}</Text> : null}
+                    </View>
+                  </View>
+                ))}
+
+                {profile && ratings.length < profile.rating_count && (
+                  <View style={{ paddingVertical: 12 }}>
+                    <Button variant="outline" onPress={loadMoreRatings} disabled={ratingsLoading}>
+                      {ratingsLoading ? (
+                        <ActivityIndicator size="small" color={colors.primary} />
+                      ) : (
+                        <Text>Load more</Text>
+                      )}
+                    </Button>
+                  </View>
+                )}
+              </View>
+            )}
+          </ScrollView>
+          <DialogFooter>
+            <Button variant="outline" onPress={() => setReviewsModalOpen(false)}>
+              <Text>Close</Text>
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {Platform.OS !== "web" && (
         <BottomNav
           unreadCount={_ws.unreadCount}

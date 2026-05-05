@@ -189,7 +189,11 @@ const listingsRoutes = new Elysia()
 
         const images = db.query("SELECT s3_url AS url, sort_order FROM listing_images WHERE listing_id = ? ORDER BY sort_order ASC").all(params.id);
 
-        return { listing: { ...(listing as object), images }, status: 200 };
+        const transaction = db.query(
+            `SELECT id, buyer_id, seller_id, sold_at FROM transactions WHERE listing_id = ?`
+        ).get(params.id) ?? null;
+
+        return { listing: { ...(listing as object), images, transaction }, status: 200 };
     })
 
     .patch("/listings/:id", async ({ params, body, headers, jwt }) => {

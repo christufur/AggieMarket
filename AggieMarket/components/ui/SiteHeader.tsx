@@ -327,9 +327,8 @@ export function SiteHeader({
               paddingHorizontal: 12,
               height: 42,
               gap: 8,
-              width: "100%" as any,
-              maxWidth: 480,
-              flexShrink: 1,
+              width: 520,
+              flexShrink: 0,
             }}
           >
             <Ionicons name="search-outline" size={16} color={colors.dark} />
@@ -421,21 +420,6 @@ export function SiteHeader({
             <NavAvatar name={name} avatarUrl={avatarUrl} size={32} />
           </Pressable>
 
-          {onNewPost ? (
-            <Button
-              size="sm"
-              onPress={onNewPost}
-              style={{
-                backgroundColor: colors.primary,
-                borderRadius: 10,
-                height: 38,
-                paddingHorizontal: 16,
-              }}
-            >
-              <Text style={{ color: colors.white, fontSize: 13, fontWeight: "700" }}>+ New Post</Text>
-            </Button>
-          ) : null}
-
           {showLogout ? (
             <Pressable
               onPress={handleLogout}
@@ -453,6 +437,21 @@ export function SiteHeader({
               <Ionicons name="log-out-outline" size={15} color={colors.danger} />
               <Text style={{ fontSize: 13, fontWeight: "700", color: colors.danger }}>Log Out</Text>
             </Pressable>
+          ) : null}
+
+          {onNewPost ? (
+            <Button
+              size="sm"
+              onPress={onNewPost}
+              style={{
+                backgroundColor: colors.primary,
+                borderRadius: 10,
+                height: 38,
+                paddingHorizontal: 16,
+              }}
+            >
+              <Text style={{ color: colors.white, fontSize: 13, fontWeight: "700" }}>+ New Post</Text>
+            </Button>
           ) : null}
         </View>
       </View>

@@ -62,6 +62,45 @@ export type RatingItem = {
   reviewer_name: string | null;
 };
 
+export type PendingRatingTransaction = {
+  id: string;
+  listing_id: string;
+  seller_id: number;
+  buyer_id: number;
+  sold_at: string;
+  listing_title: string;
+  listing_price: number | null;
+  listing_is_free: number;
+  listing_image: string | null;
+  counterparty_id: number;
+  counterparty_name: string | null;
+  counterparty_avatar: string | null;
+  my_role: "buyer" | "seller";
+};
+
+export type TransactionDetail = {
+  id: string;
+  listing_id: string;
+  seller_id: number;
+  buyer_id: number | null;
+  sold_at: string | null;
+  listing_title: string;
+  seller_name: string | null;
+  buyer_name: string | null;
+  my_role: "buyer" | "seller";
+  counterparty: {
+    id: number | null;
+    name: string | null;
+    role: "buyer" | "seller";
+  };
+  my_rating: {
+    id: number;
+    stars: number;
+    body: string | null;
+    created_at: string;
+  } | null;
+};
+
 export type Conversation = {
   id: string;
   listing_id: string | null;

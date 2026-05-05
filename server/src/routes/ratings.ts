@@ -110,6 +110,105 @@ const ratingsRoutes = new Elysia()
     `).all(params.id, limit, offset);
 
     return { ratings, status: 200 };
+  })
+
+  .get("/transactions/pending-ratings", async ({ headers, jwt }) => {
+    const payload = await requireAuth(headers, jwt);
+    if ('status' in payload) return payload;
+
+    const userId = Number(payload.id);
+
+    const transactions = db.query(`
+      SELECT
+        t.id,
+        t.listing_id,
+        t.seller_id,
+        t.buyer_id,
+        t.sold_at,
+        l.title AS listing_title,
+        l.price AS listing_price,
+        l.is_free AS listing_is_free,
+        (SELECT s3_url FROM listing_images
+           WHERE listing_id = l.id
+           ORDER BY sort_order ASC, id ASC
+           LIMIT 1) AS listing_image,
+        CASE WHEN t.buyer_id = ? THEN t.seller_id ELSE t.buyer_id END AS counterparty_id,
+        cp.name AS counterparty_name,
+        cp.avatar_url AS counterparty_avatar,
+        CASE WHEN t.buyer_id = ? THEN 'buyer' ELSE 'seller' END AS my_role
+      FROM transactions t
+      JOIN listings l ON l.id = t.listing_id
+      LEFT JOIN users cp
+        ON cp.id = CASE WHEN t.buyer_id = ? THEN t.seller_id ELSE t.buyer_id END
+      WHERE t.sold_at IS NOT NULL
+        AND t.buyer_id IS NOT NULL
+        AND (t.buyer_id = ? OR t.seller_id = ?)
+        AND NOT EXISTS (
+          SELECT 1 FROM ratings r
+          WHERE r.transaction_id = t.id AND r.reviewer_id = ?
+        )
+      ORDER BY t.sold_at DESC
+    `).all(userId, userId, userId, userId, userId, userId);
+
+    return { transactions, status: 200 };
+  })
+
+  .get("/transactions/:id", async ({ params, headers, jwt }) => {
+    const payload = await requireAuth(headers, jwt);
+    if ('status' in payload) return payload;
+
+    const userId = Number(payload.id);
+
+    const transaction = db.query(`
+      SELECT
+        t.id,
+        t.listing_id,
+        t.seller_id,
+        t.buyer_id,
+        t.sold_at,
+        l.title AS listing_title,
+        seller.name AS seller_name,
+        buyer.name AS buyer_name
+      FROM transactions t
+      JOIN listings l ON l.id = t.listing_id
+      LEFT JOIN users seller ON seller.id = t.seller_id
+      LEFT JOIN users buyer ON buyer.id = t.buyer_id
+      WHERE t.id = ?
+    `).get(params.id) as {
+      id: string;
+      listing_id: string;
+      seller_id: number;
+      buyer_id: number | null;
+      sold_at: string | null;
+      listing_title: string;
+      seller_name: string | null;
+      buyer_name: string | null;
+    } | null;
+
+    if (!transaction) return { message: "Transaction not found", status: 404 };
+
+    const isBuyer = Number(transaction.buyer_id) === userId;
+    const isSeller = Number(transaction.seller_id) === userId;
+    if (!isBuyer && !isSeller) return { message: "Forbidden", status: 403 };
+
+    const myRating = db.query(`
+      SELECT id, stars, body, created_at FROM ratings
+      WHERE transaction_id = ? AND reviewer_id = ?
+    `).get(params.id, userId) as { id: number; stars: number; body: string | null; created_at: string } | null;
+
+    const counterparty = isBuyer
+      ? { id: transaction.seller_id, name: transaction.seller_name, role: "seller" as const }
+      : { id: transaction.buyer_id, name: transaction.buyer_name, role: "buyer" as const };
+
+    return {
+      transaction: {
+        ...transaction,
+        my_role: isBuyer ? "buyer" : "seller",
+        counterparty,
+        my_rating: myRating,
+      },
+      status: 200,
+    };
   });
 
 export default ratingsRoutes;
