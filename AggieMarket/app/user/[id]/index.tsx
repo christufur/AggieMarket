@@ -230,8 +230,8 @@ export default function PublicProfileScreen() {
                     <View style={{ gap: 16 }}>
                       <View style={{ flexDirection: "row", alignItems: "center", gap: 20, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: colors.border }}>
                         <View style={{ alignItems: "center" }}>
-                          <Text style={{ fontSize: 40, fontWeight: "800", color: colors.ink }}>{profile.rating_avg.toFixed(1)}</Text>
-                          <View style={{ flexDirection: "row", gap: 2, marginTop: 2 }}>
+                          <Text style={{ fontSize: 40, fontWeight: "800", color: colors.ink, lineHeight: 44 }}>{profile.rating_avg.toFixed(1)}</Text>
+                          <View style={{ flexDirection: "row", gap: 2, marginTop: 8 }}>
                             {[1, 2, 3, 4, 5].map((i) => (
                               <Ionicons
                                 key={i}
