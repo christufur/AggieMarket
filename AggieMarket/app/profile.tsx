@@ -253,7 +253,7 @@ export default function ProfileScreen() {
                 }}>
                   <Ionicons name="calendar-outline" size={12} color={colors.dark} />
                   <Text style={{ fontSize: 12, fontWeight: "500", color: colors.dark }}>
-                    {fmtJoined(profile?.created_at ?? new Date().toISOString())}
+                    {profile?.created_at ? fmtJoined(profile.created_at) : ''}
                   </Text>
                 </View>
               </View>
@@ -560,9 +560,9 @@ export default function ProfileScreen() {
                       {
                         paddingHorizontal: 14, paddingVertical: 7,
                         borderRadius: 100,
-                        cursor: "pointer" as any,
-                        transition: "background-color 150ms ease" as any,
-                      },
+                        cursor: "pointer",
+                        transition: "background-color 150ms ease",
+                      } as any,
                       contentTab === key
                         ? { backgroundColor: colors.primary }
                         : { backgroundColor: "transparent" },
@@ -599,9 +599,9 @@ export default function ProfileScreen() {
                                 {
                                   paddingHorizontal: 14, paddingVertical: 6,
                                   borderRadius: 100,
-                                  cursor: "pointer" as any,
-                                  transition: "background-color 150ms ease" as any,
-                                },
+                                  cursor: "pointer",
+                                  transition: "background-color 150ms ease",
+                                } as any,
                                 listingsTab === tab
                                   ? { backgroundColor: colors.primary }
                                   : { backgroundColor: "transparent" },

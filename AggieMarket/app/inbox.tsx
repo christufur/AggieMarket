@@ -373,7 +373,8 @@ function ChatPanel({ conversation, token, userId }: {
 
   // Auto-scroll on new messages
   useEffect(() => {
-    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
+    const id = setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
+    return () => clearTimeout(id);
   }, [messages.length]);
 
   const sendMessageContent = async (text: string) => {

@@ -128,19 +128,20 @@ function Toast({ message, visible }: { message: string; visible: boolean }) {
   const translateY = useRef(new Animated.Value(16)).current;
 
   useEffect(() => {
-    if (visible) {
-      Animated.parallel([
-        Animated.timing(opacity, { toValue: 1, duration: 220, useNativeDriver: true }),
-        Animated.timing(translateY, { toValue: 0, duration: 220, useNativeDriver: true }),
-      ]).start(() => {
-        setTimeout(() => {
-          Animated.parallel([
-            Animated.timing(opacity, { toValue: 0, duration: 280, useNativeDriver: true }),
-            Animated.timing(translateY, { toValue: 16, duration: 280, useNativeDriver: true }),
-          ]).start();
-        }, 1800);
-      });
-    }
+    if (!visible) return;
+    let timerId: ReturnType<typeof setTimeout> | null = null;
+    Animated.parallel([
+      Animated.timing(opacity, { toValue: 1, duration: 220, useNativeDriver: true }),
+      Animated.timing(translateY, { toValue: 0, duration: 220, useNativeDriver: true }),
+    ]).start(() => {
+      timerId = setTimeout(() => {
+        Animated.parallel([
+          Animated.timing(opacity, { toValue: 0, duration: 280, useNativeDriver: true }),
+          Animated.timing(translateY, { toValue: 16, duration: 280, useNativeDriver: true }),
+        ]).start();
+      }, 1800);
+    });
+    return () => { if (timerId) clearTimeout(timerId); };
   }, [visible]);
 
   return (
@@ -576,7 +577,7 @@ function CreatePostModal({
           <View className="flex-row flex-wrap gap-2">
             {images.map((img, i) => (
               <Pressable
-                key={i}
+                key={img.uri ?? i}
                 className="w-[72px] h-[72px] rounded-lg overflow-hidden relative"
                 onPress={() => setImages((prev) => prev.filter((_, idx) => idx !== i))}
                 disabled={saving}
@@ -911,16 +912,21 @@ function RailCard({ title, link, onLinkPress, children }: { title: string; link?
   );
 }
 
-function DateBlock({ when }: { when: string }) {
-  const [datePart] = (when || '').split(' · ');
-  const [mon, day] = (datePart || '').split(' ');
+function DateBlock({ iso }: { iso?: string | null }) {
+  const [parts, setParts] = useState<{ mon: string; day: string }>({ mon: '', day: '' });
+  useEffect(() => {
+    if (!iso) { setParts({ mon: '', day: '' }); return; }
+    const formatted = new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const [mon, day] = formatted.split(' ');
+    setParts({ mon: mon ?? '', day: day ?? '' });
+  }, [iso]);
   return (
     <View style={{ width: 44, borderWidth: 1.5, borderColor: colors.primary200, borderRadius: 8, overflow: 'hidden', flexShrink: 0 }}>
       <View style={{ backgroundColor: colors.primary, paddingVertical: 2, alignItems: 'center' }}>
-        <Text style={{ color: colors.white, fontSize: 9, fontWeight: '800', letterSpacing: 0.6 }}>{(mon || '').toUpperCase()}</Text>
+        <Text style={{ color: colors.white, fontSize: 9, fontWeight: '800', letterSpacing: 0.6 }}>{parts.mon.toUpperCase()}</Text>
       </View>
       <View style={{ paddingVertical: 4, alignItems: 'center' }}>
-        <Text style={{ fontSize: 18, fontWeight: '800', color: colors.primary }}>{day}</Text>
+        <Text style={{ fontSize: 18, fontWeight: '800', color: colors.primary }}>{parts.day}</Text>
       </View>
     </View>
   );
@@ -1281,7 +1287,7 @@ export default function HomeWebScreen() {
               <View style={{ backgroundColor: colors.white, borderWidth: 1, borderColor: colors.border, borderRadius: 14, padding: 14, gap: 12 }}>
                 {weekEvents.map(e => (
                   <Pressable key={e.id} onPress={() => router.push(`/event/${e.id}`)} style={{ flexDirection: 'row', gap: 12, alignItems: 'flex-start' }}>
-                    <DateBlock when={e.starts_at ? new Date(e.starts_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''} />
+                    <DateBlock iso={e.starts_at} />
                     <View style={{ flex: 1, minWidth: 0 }}>
                       <Text style={{ fontSize: 13, fontWeight: '700', lineHeight: 18, color: colors.ink }} numberOfLines={2}>{e.title}</Text>
                       <Text style={{ fontSize: 11, color: colors.dark, marginTop: 2 }} numberOfLines={1}>{e.location}</Text>
@@ -1488,7 +1494,7 @@ export default function HomeWebScreen() {
                   <View style={{ gap: 12 }}>
                     {weekEvents.map(e => (
                       <Pressable key={e.id} onPress={() => router.push(`/event/${e.id}`)} style={{ flexDirection: 'row', gap: 12, alignItems: 'flex-start' }}>
-                        <DateBlock when={e.starts_at ? new Date(e.starts_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''} />
+                        <DateBlock iso={e.starts_at} />
                         <View style={{ flex: 1, minWidth: 0 }}>
                           <Text style={{ fontSize: 13, fontWeight: '700', lineHeight: 18, color: colors.ink }} numberOfLines={2}>{e.title}</Text>
                           <Text style={{ fontSize: 11, color: colors.dark, marginTop: 2 }} numberOfLines={1}>{e.location}</Text>

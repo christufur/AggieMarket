@@ -342,9 +342,9 @@ export default function ListingDetailScreenWeb() {
                           alignItems: "center",
                           gap: 5,
                         }}>
-                          {images.map((_, i) => (
+                          {images.map((img, i) => (
                             <View
-                              key={i}
+                              key={img.url ?? i}
                               style={i === imgIdx ? {
                                 width: 18,
                                 height: 6,
@@ -383,7 +383,7 @@ export default function ListingDetailScreenWeb() {
                     <View className="mt-3 flex-row gap-2">
                       {images.map((img, i) => (
                         <Pressable
-                          key={i}
+                          key={img.url ?? i}
                           onPress={() => setImgIdx(i)}
                           style={{
                             width: 60,
@@ -595,7 +595,6 @@ export default function ListingDetailScreenWeb() {
                               placeholder="Hi, is this still available?"
                               numberOfLines={3}
                               editable={!msgSending}
-                              autoFocus
                             />
                             {msgError ? (
                               <Text className="text-xs text-destructive">{msgError}</Text>

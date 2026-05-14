@@ -235,7 +235,7 @@ export default function ServiceDetailScreenWeb() {
                   <View className="mt-3 flex-row gap-2">
                     {images.map((img, i) => (
                       <Pressable
-                        key={i}
+                        key={img.url ?? i}
                         onPress={() => setImgIdx(i)}
                         style={{
                           width: 60,
@@ -394,7 +394,6 @@ export default function ServiceDetailScreenWeb() {
                             placeholder="Hi, I'm interested in your service..."
                             numberOfLines={3}
                             editable={!msgSending}
-                            autoFocus
                           />
                           {msgError ? (
                             <Text className="text-xs text-destructive">{msgError}</Text>
