@@ -1,3 +1,14 @@
+/**
+ * WebSocketContext — single live WS connection per app session.
+ *
+ * Opens `<API.wsChat>?token=<JWT>` when a user is logged in, exposes a small
+ * pub/sub API so any screen can subscribe to typed event payloads ("typing",
+ * "new_message", "unread_changed", …) without re-opening sockets. The
+ * connection auto-reconnects with exponential backoff and is closed on
+ * logout. Also tracks `unreadCount` for the inbox badge.
+ *
+ * Consume with `const { subscribe, send, isConnected, unreadCount } = useWebSocket()`.
+ */
 import {
   createContext,
   useCallback,

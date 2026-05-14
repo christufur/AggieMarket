@@ -1,3 +1,12 @@
+/**
+ * AggieMarket API — entry point.
+ *
+ * Boots an Elysia HTTP + WebSocket server, applies CORS, and mounts every
+ * route module under a flat URL space (e.g. /auth/*, /listings/*, /events/*).
+ * Run with `bun dev` (hot reload) or `bun index.ts` (production via PM2).
+ *
+ * Required env: JWT_SECRET (fail-fast below). Optional: PORT, RESEND_*, AWS_*.
+ */
 import { Elysia } from "elysia";
 import { cors } from "@elysiajs/cors";
 

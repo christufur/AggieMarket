@@ -1,3 +1,19 @@
+/**
+ * Listings routes.
+ *
+ * Endpoints (mounted by server/index.ts):
+ *   GET    /listings                 — paginated list with filters + FTS search
+ *   GET    /listings/:id             — single listing with images and seller
+ *   POST   /listings                 — create (auth required)
+ *   PATCH  /listings/:id             — update fields (owner only)
+ *   POST   /listings/:id/mark-sold   — atomic mark-sold + open a transaction
+ *   POST   /listings/:id/images      — attach image URLs after upload
+ *   DELETE /listings/:id             — soft delete (owner only)
+ *
+ * Search uses an FTS5 virtual table (`listings_fts`) kept in sync via triggers
+ * defined in src/db/index.ts. `buildListingsQuery` composes the SQL + params
+ * for the list endpoint based on the query string.
+ */
 import { Elysia } from "elysia";
 import { jwt } from "@elysiajs/jwt";
 import db from "../db";
@@ -14,6 +30,7 @@ type PatchListingBody = {
     status?: string;
 };
 
+// Composes the SELECT + WHERE clauses for GET /listings from a parsed query.
 function buildListingsQuery(options: {
     category?: string;
     condition?: string;

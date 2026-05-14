@@ -1,3 +1,15 @@
+/**
+ * WebSocket route — /ws/chat.
+ *
+ * Authenticates the socket via a `?token=<JWT>` query parameter (browsers can't
+ * set headers on a WebSocket handshake), registers the connection in the
+ * in-memory user-→-socket map (see utils/connections), and relays "typing"
+ * events to the other participant of a conversation.
+ *
+ * New-message delivery does NOT go through this handler — POST
+ * /conversations/:id/messages already pushes to the recipient over their
+ * registered socket via sendToUser().
+ */
 import { Elysia } from "elysia";
 import { jwt } from "@elysiajs/jwt";
 import db from "../db";

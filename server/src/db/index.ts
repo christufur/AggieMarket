@@ -1,3 +1,21 @@
+/**
+ * SQLite database setup.
+ *
+ * On import, opens (or creates) the SQLite file and declares every table,
+ * index, FTS5 virtual table, and trigger the app needs. In test mode
+ * (NODE_ENV=test) an in-memory database is used so the on-disk file is
+ * never touched.
+ *
+ * Highlights:
+ *   - WAL journaling for safe concurrent reads while writing.
+ *   - FTS5 virtual tables (listings_fts, services_fts, events_fts) backed by
+ *     INSERT/UPDATE/DELETE triggers so full-text search stays in sync with
+ *     the source rows.
+ *   - Rating triggers recompute `users.rating_avg` and `users.rating_count`
+ *     whenever a rating is inserted, updated, or deleted.
+ *
+ * Exports the shared `db` handle used by every route module.
+ */
 import {Database} from "bun:sqlite";
 
 const isTest = process.env.NODE_ENV === "test";

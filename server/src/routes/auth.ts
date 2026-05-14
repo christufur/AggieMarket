@@ -1,11 +1,29 @@
+/**
+ * Auth routes.
+ *
+ * Endpoints (mounted by server/index.ts):
+ *   POST /auth/register             — create pending user, email a 6-digit code
+ *   POST /auth/verify-email         — exchange code for an active account + JWT
+ *   POST /auth/resend-verification  — re-issue the code
+ *   POST /auth/login                — verify credentials, return JWT + user
+ *   POST /auth/forgot-password      — email a reset code (always returns 200 to
+ *                                     avoid leaking which emails are registered)
+ *   POST /auth/reset-password       — consume the reset code, set new password
+ *   GET  /auth/me                   — return the user for the bearer token
+ *
+ * Signup is restricted to `@nmsu.edu` addresses. Passwords are hashed with
+ * Bun's built-in password hasher. JWTs are signed with JWT_SECRET.
+ */
 import { Elysia } from "elysia"
 import { jwt } from "@elysiajs/jwt"
 import crypto from "crypto";
 import db from "../db";
 import { sendVerificationEmail, sendPasswordResetEmail } from "../utils/email";
 
+// Only NMSU students are allowed to sign up.
 const isValidEmail = (email: string) => email.endsWith("@nmsu.edu");
 
+// 6-digit numeric code for email verification + password reset.
 const generateToken = () => crypto.randomInt(100000, 1000000).toString();
 
 const authRoutes = new Elysia()

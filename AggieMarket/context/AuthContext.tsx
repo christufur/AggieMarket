@@ -1,3 +1,13 @@
+/**
+ * AuthContext — holds the current user, JWT, and login/logout actions.
+ *
+ * On mount, restores a saved JWT from cross-platform storage (AsyncStorage on
+ * native, localStorage on web) and revalidates it against GET /auth/me. On
+ * native logins, attempts to register the device for Expo push notifications
+ * (best-effort — failure is swallowed so login never blocks).
+ *
+ * Consume with `const { user, token, login, logout } = useAuth()`.
+ */
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { Platform } from "react-native";
 import * as Notifications from "expo-notifications";

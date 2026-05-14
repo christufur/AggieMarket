@@ -1,9 +1,24 @@
+/**
+ * Conversations + messaging routes.
+ *
+ * Endpoints (mounted by server/index.ts):
+ *   GET   /conversations                  — current user's threads with unread count
+ *   POST  /conversations                  — start (or return) the thread for a listing/service/event
+ *   GET   /conversations/:id/messages     — message history (access-checked)
+ *   POST  /conversations/:id/messages     — send a message; pushes via WS + Expo
+ *   PATCH /conversations/:id/read         — mark all incoming as read
+ *
+ * On send, the message is persisted, pushed to the recipient over the live
+ * WebSocket (see utils/connections), and a fallback Expo push notification
+ * is fired off if the recipient has registered device tokens.
+ */
 import { Elysia } from "elysia";
 import { jwt } from "@elysiajs/jwt";
 import db from "../db";
 import { sendToUser } from "../utils/connections";
 import { requireAuth } from "../utils/auth";
 
+// Fire-and-forget batch push to Expo's relay; failure is logged, never thrown.
 function sendExpoPush(
     tokens: string[],
     title: string,
