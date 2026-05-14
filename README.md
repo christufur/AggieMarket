@@ -2,7 +2,7 @@
 
 A campus marketplace for NMSU students to buy, sell, trade items, offer services, and post events. Web + native (iOS/Android) via Expo Router; backend in Bun + Elysia + SQLite. Live deployment runs on AWS EC2 with PM2.
 
-![alt text](https://github.com/christufur/AggieMarket/edit/main/am.gif)
+![gif](https://github.com/christufur/AggieMarket/edit/main/am.gif)
 
 
 ## Features
