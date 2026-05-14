@@ -1,9 +1,23 @@
 # AggieMarket
 
-A campus marketplace for NMSU students to buy, sell, trade items, offer services, and post events. Web + native (iOS/Android) via Expo Router; backend in Bun + Elysia + SQLite. Live deployment runs on AWS EC2 with PM2.
+A campus marketplace for NMSU students to buy, sell, trade items, offer services, and post events. Visit:  https://aggiemarket.xyz/
 
 <img width="800" height="500" alt="am" src="https://github.com/user-attachments/assets/5e8febc1-ac86-44c1-ad3c-765713cf8124" />
 
+## Meet the Team
+
+- **Genesis Valenzo** — Frontend / UI / Project Management
+- **Christopher Meraz** — Full-stack / API / WebSocket messaging / AWS deployment
+- **Demetrius Billey** — Backend / DB
+
+
+## Motivation
+Students constantly buy, sell, and trade different items such as textbooks, dorm furniture, electronics, tutoring services, event tickets, and more. However, issues in existing marketplaces include scams, unsafe meetups, anonymous users with no accountability, transaction fees, and a lack of a visible space to list services. 
+
+Students need a way to:
+* Find affordable goods
+* Easy communication
+* Verified campus-only community
 
 ## Features
 
@@ -16,6 +30,34 @@ A campus marketplace for NMSU students to buy, sell, trade items, offer services
 - **Reports & Moderation** — users can report content; admins see a moderation queue.
 - **Auth** — NMSU-only email signup (`@nmsu.edu`), email verification via Resend, JWT-based session, forgot-password flow.
 - **Image uploads** — S3 storage with absolute URL pass-through; local fallback in dev.
+
+## Impact 
+Aggie Market is designed to alleviate students' financial burden through commission-free, peer-to-peer commerce. By providing a verified platform for buying goods, promoting student-run services, and discovering campus events, it fosters a local economy that supports both student entrepreneurs and the broader campus community. Built with a portable architecture, the platform serves as a scalable blueprint for any institution requiring a secure, domain-verified marketplace.
+
+## Testing 
+
+#### Unit Testing: 
+Used Bun’s test runner (Arrange-Act-Assert) to validate API endpoints, database queries, and authentication edge cases. Successfully verified 100% pass rates for CRUD operations and concurrent messaging logic.
+
+#### Integration Testing: 
+Conducted end-to-end workflow simulations on Web and iOS (TestFlight). Key fixes included optimizing notification badge syncing and adding event "favoriting" to improve post-RSVP engagement.
+
+#### User Testing: 
+Performed usability interviews with NMSU students. Based on feedback, we redesigned the UI/UX to improve the browsing experience.
+
+## Future Work 
+Additional features to add: 
+- Integrated campus map highlighting official NMSU safe meetup spots.
+- Structured "Offer/Negotiation" flows and a pickup scheduling system.
+- Automated event syncing via Crimson Connect.
+- Personalization engine based on browsing history and saved items.
+
+
+## Dev Summary:
+Web + native (iOS/Android) via Expo Router; backend in Bun + Elysia + SQLite. Live deployment runs on AWS EC2 with PM2.
+
+<img width="568" height="476" alt="architechture" src="https://github.com/user-attachments/assets/f2f29e10-aab2-49b6-b19e-1ecd5c170cc1" />
+
 
 ## Prerequisites
 
@@ -265,11 +307,3 @@ AggieMarket/
 - **Auth:** Custom JWT, NMSU email restriction enforced server-side, email verification + forgot-password via Resend.
 - **Realtime:** WebSocket for chat delivery, typing indicators, unread counts.
 - **Deploy:** AWS EC2 (Ubuntu) + PM2; web build can be exported to any static host.
-
-
-## Team
-
-- **Genesis Valenzo** — Frontend / UI / Project Management
-- **Christopher Meraz** — Full-stack / API / WebSocket messaging / AWS deployment
-- **Demetrius Billey** — Backend / DB
-
