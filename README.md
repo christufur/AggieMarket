@@ -1,7 +1,8 @@
 # AggieMarket
 
 A campus marketplace for NMSU students to buy, sell, trade items, offer services, and post events. Web + native (iOS/Android) via Expo Router; backend in Bun + Elysia + SQLite. Live deployment runs on AWS EC2 with PM2.
-![alt text](https://github.com/christufur/AggieMarket/edit/main/am.gif "AM video")
+
+<img width="800" height="500" alt="am" src="https://github.com/user-attachments/assets/5e8febc1-ac86-44c1-ad3c-765713cf8124" />
 
 
 ## Features
@@ -265,8 +266,10 @@ AggieMarket/
 - **Realtime:** WebSocket for chat delivery, typing indicators, unread counts.
 - **Deploy:** AWS EC2 (Ubuntu) + PM2; web build can be exported to any static host.
 
+
 ## Team
 
 - **Genesis Valenzo** — Frontend / UI / Project Management
 - **Christopher Meraz** — Full-stack / API / WebSocket messaging / AWS deployment
 - **Demetrius Billey** — Backend / DB
+
